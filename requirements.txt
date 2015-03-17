@@ -1,0 +1,2 @@
+https://github.com/jkeifer/arcpy-extensions/tarball/v0.0.1
+suds-jurko==0.6

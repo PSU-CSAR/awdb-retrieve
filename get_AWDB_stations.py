@@ -503,7 +503,7 @@ def update_all_wfs(fcstoupdate, target_workspace, servicefoldernames):
     Returns:  errorcount -- the number of FCs that were not copied successfully
     """
 
-    from arcpyExt import agsAdmin
+    from arcpy_extensions import server_admin
 
     if not fcstoupdate:
         raise Exception("No FCs to update.")
@@ -513,7 +513,7 @@ def update_all_wfs(fcstoupdate, target_workspace, servicefoldernames):
 
     try:
         print("Connecting to server admin and stopping all services in {0} folder(s)...".format(servicefoldernames))
-        agsconnection = agsAdmin.AgsAdmin.connectWithoutToken(SERVER_ADDRESS, SERVER_PORT, ADMIN_USER, ADMIN_PSWD)
+        agsconnection = server_admin.AgsAdmin.connectWithoutToken(SERVER_ADDRESS, SERVER_PORT, ADMIN_USER, ADMIN_PSWD)
         for servicefoldername in servicefoldernames:
             errors += agsconnection.stopAllServicesInFolder(servicefoldername)
     except Exception as e:

@@ -36,6 +36,24 @@ download each of these packages and run the setup.py script using the
 python to which installation of these packages is desired.
 
 
+Additional Dependency
+---------------------
+
+The script has an additional dependency not included in the repository
+and cannot be installed from another source. For security's sake, the
+administrator login information required to perform operations on the
+AWDB webservices has not been included in the script, and must be imported
+from a separate python module named `login_settings.py`. The contents of that
+file should simply be:
+
+```py
+ADMIN_USER = <admin_username>
+ADMIN_PASS = <admin_password>
+```
+
+The file should be placed in the same directory as the script.
+
+
 Support
 -------
 

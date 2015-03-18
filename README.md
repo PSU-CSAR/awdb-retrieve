@@ -29,7 +29,7 @@ dependencies outside the python standard library:
 
 To install suds-jurko and arcpy-extensions with pip available, simply:
 
-    pip install requirements.txt
+    pip install -r requirements.txt
 
 If pip is unavailable, e.g., when using the ArcGIS-installed python,
 download each of these packages and run the setup.py script using the

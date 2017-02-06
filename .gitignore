@@ -28,6 +28,7 @@ var/
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+maps/
 
 # secret info
 settings.py
@@ -41,6 +42,8 @@ htmlcov/
 nosetests.xml
 coverage.xml
 *,cover
+# database connections
+*.sde
 
 # Translations
 *.mo

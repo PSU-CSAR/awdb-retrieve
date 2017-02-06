@@ -7,109 +7,99 @@
 #           NRCS Air-Water Database, reprojects them, writes them to
 #           an SDE database, then publishes them to a web service.
 #
-# USAGE:    The script requires no arguments, but some key constants,
-#           such as output locations and network codes to download,
-#           are grouped at the beginning of this file.
+# USAGE:    The script requires no arguments, but some key constants
+#           need to set in the settings.py file. Copy the
+#           settings_template.py file with the namr settings.py and
+#           edit as reqiured.
 #
 #           Run with 64-bit python install due to problem reading SDE.
 # --------------------------------------------------------------------
 
 # some import statements in functions to speed process generation
-from __future__ import print_function
+from __future__ import print_function, absolute_import
 from suds.client import Client
 from urllib2 import URLError
 from multiprocessing import Process, Lock, Queue
 import traceback
 import os
 import logging
-from login_settings import ADMIN_USER, ADMIN_PSWD
+
+
+# load settings from settings.py
+try:
+    import settings
+except:
+    raise Exception(
+        "Please copy the settings_template.py file to " +
+        "a file named settings.py and edit the values as required."
+    )
 
 
 # --------------------------------------
 #            GLOBAL CONSTANTS
 # --------------------------------------
 
-# output locations
-#TEMP_WORKSPACE = r"C:\Users\phoetrymaster\Documents\Testing\AWDB"  #?
-ARCHIVE_WORKSPACE = r"C:\inetpub\ftproot\AWDB\Stations"  # zip each shapefile here for FTP access
-TEMP_WORKSPACE = r"C:\GIS\GIS_Data\NRCS\AWDB\Stations"  # location for intermediate files
-TEMP_GDB_NAME = "awdb_temp"  # Name of temp GDB
-
-# sde target database -- for WFSs
-SDE_WORKSPACE = r"C:\GIS\_SDEConnections\atlasprod_awdb.sde"  # SDE database connection
-SDE_DATABASE = "atlasprod"
-SDE_USERNAME = "sde_awdb"
-FDS_SDE_PREFIX = SDE_DATABASE + "." + SDE_USERNAME + "."
-
-# name of output feature dataset
-FDS_NAME = "AWDB"  # set to None to write to DB root, not dataset
-
-# url of the NRCS AWDB SOAP WDSL (defines the web API connection)
-WDSL = "http://www.wcc.nrcs.usda.gov/awdbWebService/services?WSDL"
+__DEBUG__ = False  # true outputs debug-level messages to stderr
 
 # NRCS AWDB network codes to download
 NETWORKS = ["SNTL", "SNOW", "USGS", "COOP", "SCAN", "SNTLT", "OTHER", "BOR",
             "MPRC", "MSNT"]
-#NETWORKS = ["SNOW"]
 
-
-# dictionaries of the station fields
-# these fields are required, and are geometry, so do not need to be aded to the output FC
-REQUIRED_FIELDS = [{"field_name": "elevation"},
-                  {"field_name": "latitude"},
-                  {"field_name": "longitude"}
-                  ]
+## Dictionaries of the station fields
+# these fields are required, and are geometry,
+# so do not need to be aded to the output FC
+REQUIRED_FIELDS = [
+    {"field_name": "elevation"},
+    {"field_name": "latitude"},
+    {"field_name": "longitude"},
+]
 
 # these fields will be added to the output FC, but can be null
-FIELDS = [{"field_name": "actonId",             "field_type": "TEXT", "field_length": 20},  # 0
-          {"field_name": "beginDate",           "field_type": "DATE"},                      # 1
-          {"field_name": "countyName",          "field_type": "TEXT", "field_length": 25},  # 2
-          {"field_name": "endDate",             "field_type": "DATE"},                      # 3
-          {"field_name": "fipsCountryCd",       "field_type": "TEXT", "field_length": 5},   # 4
-          {"field_name": "fipsCountyCd",        "field_type": "SHORT"},                     # 5
-          {"field_name": "fipsStateNumber",     "field_type": "SHORT"},                     # 6
-          {"field_name": "huc",                 "field_type": "TEXT", "field_length": 20},  # 7
-          {"field_name": "hud",                 "field_type": "TEXT", "field_length": 20},  # 8
-          {"field_name": "name",                "field_type": "TEXT", "field_length": 100}, # 9
-          {"field_name": "shefId",              "field_type": "TEXT", "field_length": 20},  # 10
-          {"field_name": "stationDataTimeZone", "field_type": "DOUBLE"},                    # 11
-          {"field_name": "stationTimeZone",     "field_type": "DOUBLE"},                    # 12
-          {"field_name": "stationTriplet",      "field_type": "TEXT", "field_length": 50},  # 13
-          {"field_name": "elevation",           "field_type": "DOUBLE"},                    # 14
-          ]
+FIELDS = [
+    {"field_name": "actonId",             "field_type": "TEXT", "field_length": 20},  # 0
+    {"field_name": "beginDate",           "field_type": "DATE"},                      # 1
+    {"field_name": "countyName",          "field_type": "TEXT", "field_length": 25},  # 2
+    {"field_name": "endDate",             "field_type": "DATE"},                      # 3
+    {"field_name": "fipsCountryCd",       "field_type": "TEXT", "field_length": 5},   # 4
+    {"field_name": "fipsCountyCd",        "field_type": "SHORT"},                     # 5
+    {"field_name": "fipsStateNumber",     "field_type": "SHORT"},                     # 6
+    {"field_name": "huc",                 "field_type": "TEXT", "field_length": 20},  # 7
+    {"field_name": "hud",                 "field_type": "TEXT", "field_length": 20},  # 8
+    {"field_name": "name",                "field_type": "TEXT", "field_length": 100}, # 9
+    {"field_name": "shefId",              "field_type": "TEXT", "field_length": 20},  # 10
+    {"field_name": "stationDataTimeZone", "field_type": "DOUBLE"},                    # 11
+    {"field_name": "stationTimeZone",     "field_type": "DOUBLE"},                    # 12
+    {"field_name": "stationTriplet",      "field_type": "TEXT", "field_length": 50},  # 13
+    {"field_name": "elevation",           "field_type": "DOUBLE"},                    # 14
+]
 
+## USGS metadata retrival constants
+# fields to add: tuple of name and data type
+NEW_FIELDS = [
+    ("basinarea", "DOUBLE"),
+    ("USGS_ID", "TEXT"),
+    ("USGSname", "TEXT"),
+]
+# the stationTriplet field name (used for the ID) is defined in FIELDS above
+STATION_ID_FIELD = FIELDS[13]["field_name"]
 
-# number of attempts to retry getting station
-RETRY_COUNT = 2
-
-# message inserted into queue to signal end or logging message
+## Message inserted into queue to signal end of logging message
 QUEUE_DONE = "DONE"
 MESSAGE_CODE = "MSG"
 
-# number of worker processes to get station records (max number of processes)
-WORKER_PROCESSES = 10
-
-# maximum number of records per metadata request (larger is faster but more likely to timeout)
-MAX_REQUEST = 250
-
-
-# ArcGIS Server settings
-SERVER_ADDRESS = "atlas.geog.pdx.edu"  # PSU server hosting AWDB services
-SERVER_PORT = "6080"
-
-# WFS service settings
+## WFS service settings
 # name of the folders containing all the AWDB web services
-WFS_SERVICE_FOLDERS = ["AWDB", "AWDB_ALL", "AWDB_ACTIVE", "AWDB_INACTIVE"]
+WFS_SERVICE_FOLDERS = ["AWDB_ALL", "AWDB_ACTIVE", "AWDB_INACTIVE"]
 
-# USGS metadata retrival constants
-NEW_FIELDS = [("basinarea", "DOUBLE"), ("USGS_ID", "TEXT"), ("USGSname", "TEXT")]  # fields to add: tuple of name and data type
-STATION_ID_FIELD = FIELDS[13]["field_name"]  # the stationTriplet field name is defined in FIELDS above
-USGS_URL = "http://waterservices.usgs.gov/nwis/site/"  # URL of the USGS site information REST service
+## Logging constants
+# contains debug info
+FULL_LOGFILE = os.path.join(settings.LOG_DIR, "AWDB_LOG.txt")
+# records processed OK/Failed only
+SUMMARY_LOGFILE = os.path.join(settings.LOG_DIR, "AWDB_SUMMARY.txt")
 
-# logging constants
-FULL_LOGFILE = os.path.join(TEMP_WORKSPACE, "AWDB_LOG.txt")  # contains debug info
-SUMMARY_LOGFILE = os.path.join(TEMP_WORKSPACE, "AWDB_SUMMARY.txt")  # records processed OK/Failed only
-__DEBUG__ = False  # true outputs debug-level messages to stderr
+## Other
+# name of temp GDB
+TEMP_GDB_NAME = "awdb_temp"
 
 
 # -------------------------------
@@ -217,7 +207,7 @@ def get_multiple_stations_thread(stations, outQueue, queueLock, recursiveCall=0)
     data = None
 
     try:
-        client = Client(WDSL)  # connect to the service definition
+        client = Client(settings.WDSL_URL)  # connect to the service definition
         data = client.service.getStationMetadataMultiple(stationTriplets=stations)
     except Exception as e:
         with queueLock:
@@ -273,15 +263,22 @@ def get_stations(stationIDs, stationQueue):
     import time
 
     queueLock = Lock()
-    processes = []  # to track running processes
-    for stationgroup in grouper(stationIDs, MAX_REQUEST):  #split list into 1000-station chunks to avoid timeouts
-        getProcess = Process(target=get_multiple_stations_thread, args=(stationgroup, stationQueue, queueLock), kwargs={"recursiveCall": RETRY_COUNT})  # get metadata for group
+    # list to track running processes
+    processes = []
+    # split station list into 1000-station chunks to avoid timeouts
+    for stationgroup in grouper(stationIDs, settings.MAX_REQUEST):
+        # create process to get metadata for each station group
+        getProcess = Process(
+            target=get_multiple_stations_thread,
+            args=(stationgroup, stationQueue, queueLock),
+            kwargs={"recursiveCall": settings.RETRY_COUNT}
+        )
         getProcess.daemon = True
         getProcess.start()
         processes.append(getProcess)
 
-        # if max number of processes, wait until one closes before starting another
-        while len(processes) == WORKER_PROCESSES:
+        # if at max processes, wait until one closes before starting another
+        while len(processes) == settings.WORKER_PROCESSES:
             for p in processes:
                 if not p.is_alive():
                     # p.is_alive() will be false if process closes
@@ -346,8 +343,10 @@ def get_network_stations(networkCode, fc_name, spatialref, workspace="in_memory"
     from arcpy.da import InsertCursor
 
     LOGGER.info("\nGetting stations in the {0} network...".format(networkCode))
-    client = Client(WDSL)  # connect to the service definition
-    stationIDs = client.service.getStations(networkCds=networkCode)  # get list of station IDs in network
+    # connect to the service definition
+    client = Client(settings.WDSL_URL)
+    # get list of station IDs in network
+    stationIDs = client.service.getStations(networkCds=networkCode)
     numberofstations = len(stationIDs)
     LOGGER.log(15, "Found {0} stations in {1} network.".format(numberofstations, networkCode))
 
@@ -461,7 +460,8 @@ def archive_GDB_FC(fc, outdir):
 
     filelist = glob.glob(os.path.join(tempfolder, fc_name + ".*"))
 
-    zippath = os.path.join(ARCHIVE_WORKSPACE, fc_name + today + ".zip")
+    zippath = os.path.join(settings.ARCHIVE_WORKSPACE,
+                           fc_name + today + ".zip")
 
     with zipfile.ZipFile(zippath, mode='w', compression=zipfile.ZIP_DEFLATED) as zfile:
         for f in filelist:
@@ -513,7 +513,12 @@ def update_all_wfs(fcstoupdate, target_workspace, servicefoldernames):
 
     try:
         print("Connecting to server admin and stopping all services in {0} folder(s)...".format(servicefoldernames))
-        agsconnection = server_admin.AgsAdmin.connectWithoutToken(SERVER_ADDRESS, SERVER_PORT, ADMIN_USER, ADMIN_PSWD)
+        agsconnection = server_admin.AgsAdmin.connectWithoutToken(
+            settings.SERVER_ADDRESS,
+            settings.SERVER_PORT,
+            settings.SERVER_USER,
+            settings.SERVER_PASS,
+        )
         for servicefoldername in servicefoldernames:
             errors += agsconnection.stopAllServicesInFolder(servicefoldername)
     except Exception as e:
@@ -656,18 +661,23 @@ def get_USGS_metadata(usgs_fc):
     with SearchCursor(usgs_fc, STATION_ID_FIELD) as cursor:
         for row in cursor:
             sid = row[0].split(":")[0]
-            if len(sid) >= 8 and not search('[a-zA-Z]', sid):  # valid USGS station IDs are between 8 and 15 char and are numerical
+            # valid USGS station IDs are between 8 and 15 char and are numerical
+            if len(sid) >= 8 and not search('[a-zA-Z]', sid):
                 stationIDs.append(sid)
 
-    #print(len(stationIDs))
-
     # setup and get the HTTP request
-    request = urllib2.Request(USGS_URL, urllib.urlencode({"format": "rdb",  # get the data in USGS rdb format
-                                                          "sites": ",".join(stationIDs),  # the site IDs to get, separated by commas
-                                                          "siteOutput": "expanded",  # expanded output includes basin area
-                                                          #"modifiedSince": "P" + str(SCRIPT_FREQUENCY) + "D"  # only get records modified since last run
-                                                          }))
-    request.add_header('Accept-encoding', 'gzip')  # allow gzipped response
+    request = urllib2.Request(
+        settings.USGS_URL,
+        urllib.urlencode({
+            "format": "rdb",  # get the data in USGS rdb format
+            "sites": ",".join(stationIDs),  # the site IDs to get, separated by commas
+            "siteOutput": "expanded",  # expanded output includes basin area
+            #"modifiedSince": "P" + str(SCRIPT_FREQUENCY) + "D"  # only get records modified since last run
+        })
+    )
+
+    # allow gzipped response
+    request.add_header('Accept-encoding', 'gzip')
     response = urllib2.urlopen(request)
 
     # check to see if response is gzipped and decompress if yes
@@ -739,6 +749,7 @@ def main():
     import shutil
     import arcpy
     from arcpy import env
+    from arcgisscripting import ExecuteError
 
     start = datetime.now()
     LOGGER.log(15, "\n\n--------------------------------------------------------------\n")
@@ -751,8 +762,8 @@ def main():
     # ensure SDE connection is valid
     try:
         LOGGER.log(15, "Validating DB connection...")
-        validateSDE(SDE_WORKSPACE)
-        target_workspace = SDE_WORKSPACE
+        validateSDE(settings.SDE_WORKSPACE)
+        target_workspace = settings.SDE_WORKSPACE
     except Exception as e:
         LOGGER.log(15, e)
         LOGGER.log(15, traceback.format_exc())
@@ -760,11 +771,18 @@ def main():
         return 101
 
     # if using a feature dataset, ensure exists
-    if FDS_NAME:
-        target_workspace = os.path.join(SDE_WORKSPACE, FDS_SDE_PREFIX + FDS_NAME)
+    if settings.FDS_NAME:
+        target_workspace = os.path.join(
+            settings.SDE_WORKSPACE,
+            settings.FDS_SDE_PREFIX + settings.FDS_NAME,
+        )
         try:
             LOGGER.log(15, "Validating feature dataset in DB...")
-            validateFDS(SDE_WORKSPACE, FDS_NAME, spatialref=prjSR)
+            validateFDS(
+                settings.SDE_WORKSPACE,
+                settings.FDS_NAME,
+                spatialref=prjSR,
+            )
         except Exception as e:
             LOGGER.log(15, e)
             LOGGER.log(15, traceback.format_exc())
@@ -775,7 +793,21 @@ def main():
     env.overwriteOutput = True
 
     # create temp processing workspace
-    templocation = create_temp_workspace(TEMP_WORKSPACE, TEMP_GDB_NAME)
+    try:
+        templocation = create_temp_workspace(
+            settings.TEMP_WORKSPACE,
+            TEMP_GDB_NAME,
+        )
+    except ExecuteError as e:
+        if "ERROR 000732" in e.message:
+            os.makedirs(settings.TEMP_WORKSPACE)
+            templocation = create_temp_workspace(
+                settings.TEMP_WORKSPACE,
+                TEMP_GDB_NAME,
+            )
+        else:
+            raise e
+
     LOGGER.log(15, "Temporary location is {0}.".format(templocation))
 
     wfsupdatelist = []  # list of wfs data to update
@@ -788,7 +820,7 @@ def main():
         try_count = 0
         archiveerror += 1  # add error to be removed after successful execution
 
-        while try_count <= RETRY_COUNT:
+        while try_count <= settings.RETRY_COUNT:
             try:
                 try_count += 1
                 fc = get_network_stations(network, fc_name, unprjSR)
@@ -836,7 +868,8 @@ def main():
 
         try:
             LOGGER.info("Archiving the data to the FTP site...")
-            archive_GDB_FC(projectedfc.getOutput(0), ARCHIVE_WORKSPACE)
+            archive_GDB_FC(projectedfc.getOutput(0),
+                           settings.ARCHIVE_WORKSPACE)
             write_to_summary_log("{}: stations_{} archived OK".format(datetime.now(), network))
         except Exception as e:
             LOGGER.log(15, e)

@@ -71,28 +71,36 @@ notes in the sections below.
 
 5. Use the following command to setup a new virtual env:
 
+    ```
     > conda create -n awdb_retrieve python
+    ```
     
 6. Install the dependencies:
 
+    ```
     > activate awdb_retrieve
     > conda install numpy
     > pip install https://github.com/jkeifer/arcpy-extensions/tarball/master
     > pip install suds-jurko==0.6
+    ```
 
-7. Copy the desktop10.<X>.pth file to the env site-packages:
+7. Copy the Desktop10.<X>.pth file to the env site-packages:
 
-    - The file is at C:\Python27\ArcGIS10.<X>\Lib\site-packages\Desktop10.<X>.pth
+    - The file is at `C:\Python27\ArcGIS10.<X>\Lib\site-packages\Desktop10.<X>.pth`
       where <X> is the minor ArcGIS version.
-    - Copy the file to C:\Anaconda_x86\envs\awdb_retrieve\Lib\site-packages
+    - Copy the file to `C:\Anaconda_x86\envs\awdb_retrieve\Lib\site-packages`.
 
 8. Run the script the first time (from the repo directory):
 
+    ```
     > python get_AWDB_stations.py
+    ```
 
 9. Run the mxd generator (yes, the name is misleading and should be changed):
 
+    ```
     > python create_AWDB_wfs.py
+    ```
 
 10. Publish all the webservices. The changes required to publish
     a service with the correct settings are detailed as follows:
@@ -110,19 +118,24 @@ notes in the sections below.
         - Uncheck "Enable maximum number of features returned by service"
     - Item Descritption
         - Summary: 
-          - ACTIVE: <network_code> sites from the NRCS AWDB with ACTIVE status.
-          - ALL: <network_code> sites from the NRCS AWDB.
-          - INACTIVE: <network_code> sites from the NRCS AWDB with INACTIVE status.
-        - Tags: <network_code>, NRCS, AWDB
+          - ACTIVE: `<network_code>` sites from the NRCS AWDB with ACTIVE status.
+          - ALL: `<network_code>` sites from the NRCS AWDB.
+          - INACTIVE: `<network_code>` sites from the NRCS AWDB with INACTIVE status.
+        - Tags: `<network_code>`, NRCS, AWDB
         - Descritption: same as summary
 
 11. Run the script again just to make sure it can update the data without issue.
 
 12. Setup a reoccurring task in the Task Scheduler to run the script on a weekly basis.
 
+Support
+-------
 
-Some more notes
----------------
+Please report all issues to the [issue tracker for this project](https://github.com/PSU-CSAR/awdb-retrieve/issues).
+
+
+Some notes
+----------
 
 Reviewing the script, it seems only necessary to setup the SDE DB,
 the users, and the database connection files before running the retrieve.
@@ -151,10 +164,10 @@ not registered with the server. I had to register the AWDB database
 via the readonly connection file to make Arc happy.
 
 
-And even more notes
--------------------
+And more notes (openssl problems)
+---------------------------------
 
-Ran into a terribly confusing and difficult problem,
+I ran into a terribly confusing and difficult problem,
 wherein I would get the following error when running the script:
 
     urllib2.URLError: <urlopen error: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed (_ssl.c:661)>
@@ -194,9 +207,3 @@ the bin directory, renaming it curl-ca-bundle.crt. Voila! cURL began working.
 
 Interestingly, this also fixed the python problem. I guess having this CA bundle
 on the path is enough to allow the python SSL install to use it. Thank goodness.
-
-
-Support
--------
-
-Please report all issues to the [issue tracker for this project](https://github.com/PSU-CSAR/awdb-retrieve/issues).

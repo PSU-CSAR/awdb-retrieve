@@ -127,7 +127,7 @@ def recursive_asdict(d):
 
     Requires: d -- the input suds object
 
-    Returns:  out -- a dictionary representation od d
+    Returns:  out -- a dictionary representation of d
     """
 
     from suds.sudsobject import asdict
@@ -179,7 +179,8 @@ def grouper(iterable, n, fillvalue=None):
 
     # remove any null values from station group
     if fillvalue is None:
-        pieces[len(pieces)-1] = [x for x in pieces[len(pieces)-1] if x is not None]
+        pieces[len(pieces)-1] = \
+            [x for x in pieces[len(pieces)-1] if x is not None]
 
     return pieces
 
@@ -217,7 +218,11 @@ def get_multiple_stations_thread(stations, outQueue, queueLock, recursiveCall=0)
         if "Errno 10060" in e:  # this is a connection error -- time out or no response
             with queueLock:
                 outQueue.put((MESSAGE_CODE, 15, e))
-                outQueue.put((MESSAGE_CODE, 15, "Error connecting to server. Retrying..."))
+                outQueue.put((
+                    MESSAGE_CODE,
+                    15,
+                    "Error connecting to server. Retrying...",
+                ))
         else:
             with queueLock:
                 outQueue.put((MESSAGE_CODE, 15, e))
@@ -236,12 +241,25 @@ def get_multiple_stations_thread(stations, outQueue, queueLock, recursiveCall=0)
 
     if len(stations) and recursiveCall:
         with queueLock:
-            outQueue.put((MESSAGE_CODE, 15, "Some stations were not successfully retrieved; retrying..."))
+            outQueue.put((
+                MESSAGE_CODE,
+                15,
+                "Some stations were not successfully retrieved; retrying...",
+            ))
         recursiveCall -= 1
-        get_multiple_stations_thread(stations, outQueue, queueLock, recursiveCall=recursiveCall)
+        get_multiple_stations_thread(
+            stations,
+            outQueue,
+            queueLock,
+            recursiveCall=recursiveCall,
+        )
     elif len(stations):
         with queueLock:
-            outQueue.put((MESSAGE_CODE, 15, "Stations could not be successfully retrieved:\n{0}".format(stations)))
+            outQueue.put((
+                MESSAGE_CODE,
+                15,
+                "Stations could not be successfully retrieved:\n{0}".format(stations),
+            ))
 
     return 0
 
@@ -285,7 +303,8 @@ def get_stations(stationIDs, stationQueue):
                     processes.remove(p)
             time.sleep(0.5)
 
-    # join remaining child processes to prevent done message until all records are returned
+    # join on remaining child processes to prevent done message
+    # until all records are returned
     for p in processes:
         p.join()
 
@@ -348,16 +367,26 @@ def get_network_stations(networkCode, fc_name, spatialref, workspace="in_memory"
     # get list of station IDs in network
     stationIDs = client.service.getStations(networkCds=networkCode)
     numberofstations = len(stationIDs)
-    LOGGER.log(15, "Found {0} stations in {1} network.".format(numberofstations, networkCode))
+    LOGGER.log(
+        15,
+        "Found {0} stations in {1} network.".format(numberofstations,
+                                                    networkCode)
+    )
 
-    stationQueue = Queue()  # to pass back results from thread
+    # to pass back results from thread
+    stationQueue = Queue()
 
     # create process to get station data
-    getStationProcess = Process(target=get_stations, args=(stationIDs, stationQueue))
-    getStationProcess.start()  # start thread execution
+    getStationProcess = Process(target=get_stations,
+                                args=(stationIDs, stationQueue))
+    # start thread execution
+    getStationProcess.start()
 
     LOGGER.info("Creating feature class in memory...")
-    fc = CreateFeatureclass_management(workspace, fc_name, "POINT", has_z="ENABLED", spatial_reference=spatialref)
+    fc = CreateFeatureclass_management(
+        workspace, fc_name, "POINT",
+        has_z="ENABLED", spatial_reference=spatialref
+    )
 
     LOGGER.info("Adding attribute fields to feature class...")
     for field in FIELDS:
@@ -424,7 +453,11 @@ def get_network_stations(networkCode, fc_name, spatialref, workspace="in_memory"
                               ))
             countInserted += 1
 
-    LOGGER.info("Successfully inserted {0} of {1} records into {2}.".format(countInserted, numberofstations, fc_name))
+    LOGGER.info(
+        "Successfully inserted {0} of {1} records into {2}.".format(
+            countInserted, numberofstations, fc_name
+        )
+    )
 
     if countInserted != numberofstations:
         raise Exception("ERROR: Failed to get all stations for unknown reason.")
@@ -486,7 +519,13 @@ def replace_wfs_data(newdata, target_workspace):
     from arcpy import CopyFeatures_management
     from arcpy import env
     env.overwriteOutput = True
-    CopyFeatures_management(newdata, os.path.join(target_workspace, os.path.splitext(os.path.basename(newdata))[0]))
+    CopyFeatures_management(
+        newdata,
+        os.path.join(
+            target_workspace,
+            os.path.splitext(os.path.basename(newdata))[0]
+        )
+    )
 
 
 def update_all_wfs(fcstoupdate, target_workspace, servicefoldernames):
@@ -522,10 +561,11 @@ def update_all_wfs(fcstoupdate, target_workspace, servicefoldernames):
         for servicefoldername in servicefoldernames:
             errors += agsconnection.stopAllServicesInFolder(servicefoldername)
     except Exception as e:
-        LOGGER.log(15, e)
-        LOGGER.log(15, traceback.format_exc())
-        raise Exception("Could not stop the WFS services in {0}.".format(servicefoldername))
-        return
+        if not e.message.startswith("No services were found in the folder"):
+            LOGGER.log(15, e)
+            LOGGER.log(15, traceback.format_exc())
+            raise Exception("Could not stop the WFS services in {0}.".format(servicefoldername))
+            return
     else:
         if errors:
             for servicefoldername in servicefoldernames:
@@ -548,9 +588,10 @@ def update_all_wfs(fcstoupdate, target_workspace, servicefoldernames):
         for servicefoldername in servicefoldernames:
             agsconnection.startAllServicesInFolder(servicefoldername)
     except Exception as e:
-        LOGGER.log(15, e)
-        LOGGER.log(15, traceback.format_exc())
-        errorcount += 1
+        if not e.message.startswith("No services were found in the folder"):
+            LOGGER.log(15, e)
+            LOGGER.log(15, traceback.format_exc())
+            errorcount += 1
 
     return errorcount
 
@@ -606,7 +647,8 @@ def create_temp_workspace(directory, name, is_gdb=True):
     import shutil
     from arcpy import CreateFileGDB_management
 
-    LOGGER.info("Creating temp workspace {0} in {1}...".format(name, directory))
+    LOGGER.info("Creating temp workspace {0} in {1}...".format(name,
+                                                               directory))
 
     path = os.path.join(directory, name)
 
@@ -650,7 +692,6 @@ def get_USGS_metadata(usgs_fc):
 
     for fieldname, datatype in NEW_FIELDS:
         for field in fields:
-            #print(field.name)
             if field.name == fieldname:
                 break
         else:
@@ -691,35 +732,41 @@ def get_USGS_metadata(usgs_fc):
     stationAreas = {}
     for line in data.readlines():
         if line.startswith("USGS"):
-            line = line.split("\t")  # data elements in line (station record) are separated by tabs
-            stationAreas[line[1]] = (line[29], line[1], line[2])  # the 2nd element is the station ID, 3rd is the name, and the 30th is the area
-                                                                  # order in the tuple is important, so data is entered into the correct fields in the table
-
-    #print(len(stationAreas))
+            # data elements in line (station record) are separated by tabs
+            line = line.split("\t")
+            # the 2nd element is the station ID, 3rd is the name,
+            # and the 30th is the area
+            # order in the tuple is important,
+            # so data is entered into the correct fields in the table
+            stationAreas[line[1]] = (line[29], line[1], line[2])
 
     # write the response data to the FC
-    fieldsToAccess = [STATION_ID_FIELD] + [name for name, datatype in NEW_FIELDS]
+    fieldsToAccess = [STATION_ID_FIELD]+[name for name, datatype in NEW_FIELDS]
     with UpdateCursor(usgs_fc, fieldsToAccess) as cursor:
         for row in cursor:
             stationid = row[0].split(":")[0]
 
             try:
-                row[1] = float(stationAreas[stationid][0])  # row[1] is area
+                # row[1] is area
+                row[1] = float(stationAreas[stationid][0])
             except KeyError:
                 # in case no record was returned for ID
-                continue  # skip to next record
+                # skip to next record
+                continue
             except ValueError:
                 # in case area returned is ""
                 pass
 
             try:
-                row[2] = stationAreas[stationid][1]  # row[2] is the USGS station ID
+                # row[2] is the USGS station ID
+                row[2] = stationAreas[stationid][1]
             except ValueError:
                 # in case ID returned is ""
                 pass
 
             try:
-                row[3] = stationAreas[stationid][2]  # row[3] is the USGS station name
+                # row[3] is the USGS station name
+                row[3] = stationAreas[stationid][2]
             except ValueError:
                 # in case name returned is ""
                 pass
@@ -756,8 +803,10 @@ def main():
     LOGGER.log(15, "Started at {0}.".format(start))
 
     # create spatial ref objects
-    unprjSR = arcpy.SpatialReference(4326)  # spatial ref WKID 4326: WGS 1984 GCS
-    prjSR   = arcpy.SpatialReference(102039)  # spatial ref WKID 102039: USA_Contiguous_Albers_Equal_Area_Conic_USGS_version
+    # spatial ref WKID 4326: WGS 1984 GCS
+    unprjSR = arcpy.SpatialReference(4326)
+    # spatial ref WKID 102039: USA_Contiguous_Albers_Equal_Area_Conic_USGS_version
+    prjSR = arcpy.SpatialReference(102039)
 
     # ensure SDE connection is valid
     try:
@@ -845,7 +894,7 @@ def main():
             except Exception as e:
                 LOGGER.log(15, e)
                 LOGGER.log(15, traceback.format_exc())
-                LOGGER.error("Failed to retreive the USGS area data. Could not continue.")
+                LOGGER.error("Failed to retrieve the USGS area data. Could not continue.")
                 write_to_summary_log("{}: stations_{} processing FAILED".format(datetime.now(), network))
                 continue
 
@@ -886,7 +935,11 @@ def main():
     if wfsupdatelist:
         LOGGER.info("\nUpdating WFSs in update list...")
         try:
-            updateerrors = update_all_wfs(wfsupdatelist, target_workspace, WFS_SERVICE_FOLDERS)
+            updateerrors = update_all_wfs(
+                wfsupdatelist,
+                target_workspace,
+                WFS_SERVICE_FOLDERS,
+            )
             if updateerrors:
                 LOGGER.error("\nUpdating failed with errors. Aborting...")
                 return 201
@@ -924,7 +977,7 @@ def main():
 #            MAIN CHECK
 # --------------------------------
 
-# WARNING: the main is ABSOULTELY NECESSARY on Windows when using multiprocessing.
+# WARNING: main is ABSOULTELY NECESSARY on Windows when using multiprocessing.
 # FAILURE TO USE THE MAIN CHECK WILL FILL ALL RAM AND CRASH THE ENTIRE SYSTEM.
 
 if __name__ == '__main__':
@@ -934,7 +987,7 @@ if __name__ == '__main__':
     #             LOGGING
     # -------------------------------
 
-    # in case user calls file with debugging disabled override __DEBUG__ setting
+    # in case user calls file with debug disabled override __DEBUG__ setting
     if not __debug__:
         __DEBUG__ = False
 

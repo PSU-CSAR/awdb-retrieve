@@ -998,7 +998,11 @@ if __name__ == '__main__':
     LOGGER.setLevel(15)
 
     # to write logging at debug level to file
-    fl = logging.FileHandler(FULL_LOGFILE)
+    try:
+        fl = logging.FileHandler(FULL_LOGFILE)
+    except IOError:
+        os.makedirs(os.path.dirname(FULL_LOGFILE))
+        fl = logging.FileHandler(FULL_LOGFILE)
 
     # to write logging at specified level to stderr
     pr = logging.StreamHandler()

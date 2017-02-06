@@ -35,7 +35,7 @@ FDS_NAME = "AWDB"  # set to None to write to DB root, not dataset
 
 ## Source Web Service URLs
 # url of the NRCS AWDB SOAP WDSL (defines the web API connection)
-WDSL_URL = "http://www.wcc.nrcs.usda.gov/awdbWebService/services?WSDL"
+WDSL_URL = "https://wcc.sc.egov.usda.gov/awdbWebService/services?WSDL"
 # url of the USGS site information REST service
 USGS_URL = "https://waterservices.usgs.gov/nwis/site/"
 

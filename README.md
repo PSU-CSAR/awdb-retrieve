@@ -84,10 +84,10 @@ notes in the sections below.
     > pip install suds-jurko==0.6
     ```
 
-7. Copy the Desktop10.<X>.pth file to the env site-packages:
+7. Copy the Desktop10.`<X>`.pth file to the env site-packages:
 
     - The file is at `C:\Python27\ArcGIS10.<X>\Lib\site-packages\Desktop10.<X>.pth`
-      where <X> is the minor ArcGIS version.
+      where `<X>` is the minor ArcGIS version.
     - Copy the file to `C:\Anaconda_x86\envs\awdb_retrieve\Lib\site-packages`.
 
 8. Run the script the first time (from the repo directory):

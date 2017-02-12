@@ -479,27 +479,44 @@ def archive_GDB_FC(fc, outdir):
 
     import zipfile
     import glob
+    import errno
+
     from datetime import datetime
     from arcpy import CopyFeatures_management
     from tempfile import mkdtemp
     from shutil import rmtree
 
     fc_name = os.path.basename(fc)
-    today = "_" + datetime.today().strftime("%m-%d-%Y")
+    today = datetime.today()
 
     tempfolder = mkdtemp()
 
-    CopyFeatures_management(fc, tempfolder)
+    CopyFeatures_management(fc, os.path.join(tempfolder, fc_name))
 
     filelist = glob.glob(os.path.join(tempfolder, fc_name + ".*"))
 
-    zippath = os.path.join(settings.ARCHIVE_WORKSPACE,
-                           fc_name + today + ".zip")
+    # the path to the output zipfile is ARCHIVE_WS/YYYY/MM/DD/fc_name.zip
+    zippath = os.path.join(
+        settings.ARCHIVE_WORKSPACE,
+        today.strftime(
+            "%Y{0}%m{0}%d{0}%Y-%m-%d_{1}.zip".format(os.path.sep, fc_name)
+        )
+    )
+
+    # if full directory path does not exist we need to make it
+    # so we try and ignore the error if it is already there
+    try:
+        os.makedirs(os.path.dirname(zippath))
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise e
 
     with zipfile.ZipFile(zippath, mode='w', compression=zipfile.ZIP_DEFLATED) as zfile:
         for f in filelist:
             if not f.upper().endswith('.LOCK'):
-                newfile = os.path.splitext(os.path.basename(f))[0] + today + os.path.splitext(f)[1]
+                newfile = today.strftime(
+                    "%Y-%m-%d_{}".format(os.path.basename(f))
+                )
                 zfile.write(f, newfile)
 
     rmtree(tempfolder)

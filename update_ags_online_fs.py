@@ -27,8 +27,8 @@ shrGroups = ""
 
 # Local paths to create temporary content
 relPath = sys.path[0]
-sddraft = os.path.join(relPath, "WebUpdate.sddraft")
-sd = os.path.join(relPath, "WebUpdate.sd")
+sddraft = os.path.join(settings_ags_online.repo, "WebUpdate.sddraft")
+sd = os.path.join(settings_ags_online.repo, "WebUpdate.sd")
 
 # Create a new SDDraft and stage to SD
 print("Creating SD file")

@@ -209,7 +209,10 @@ def get_multiple_stations_thread(stations, outQueue, queueLock, recursiveCall=0)
 
     try:
         client = Client(settings.WDSL_URL)  # connect to the service definition
-        data = client.service.getStationMetadataMultiple(stationTriplets=stations)
+        if len(stations) == 1:
+            data = [client.service.getStationMetadata(stations[0])]
+        else:
+            data = client.service.getStationMetadataMultiple(stationTriplets=stations)
     except Exception as e:
         with queueLock:
             outQueue.put((MESSAGE_CODE, 15, e))

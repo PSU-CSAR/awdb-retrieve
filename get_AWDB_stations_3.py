@@ -42,8 +42,9 @@ except:
 __DEBUG__ = False  # true outputs debug-level messages to stderr
 
 # NRCS AWDB network codes to download
-NETWORKS = ["SNTL", "SNOW", "USGS", "COOP", "SCAN", "SNTLT", "OTHER", "BOR",
+# NETWORKS = ["SNTL", "SNOW", "USGS", "COOP", "SCAN", "SNTLT", "OTHER", "BOR",
             "MPRC", "MSNT"]
+NETWORKS = ["SNTL"]
 
 ## Dictionaries of the station fields
 # these fields are required, and are geometry,
@@ -133,7 +134,7 @@ def recursive_asdict(d):
     from suds.sudsobject import asdict
 
     out = {}
-    for key, value in asdict(d).iteritems():
+    for key, value in asdict(d).items():
         if hasattr(value, '__keylist__'):
             out[key] = recursive_asdict(value)
         elif isinstance(value, list):
@@ -209,7 +210,10 @@ def get_multiple_stations_thread(stations, outQueue, queueLock, recursiveCall=0)
 
     try:
         client = Client(settings.WDSL_URL)  # connect to the service definition
-        data = client.service.getStationMetadataMultiple(stationTriplets=stations)
+        if len(stations) == 1:
+            data = [client.service.getStationMetadata(stations[0])]
+        else:
+            data = client.service.getStationMetadataMultiple(stationTriplets=stations)
     except Exception as e:
         with queueLock:
             outQueue.put((MESSAGE_CODE, 15, e))

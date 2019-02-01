@@ -1,13 +1,15 @@
-import logging
 import os
+import logging
 
-# load settings from settings.py
+# load settings from settings_ags_online.py
+# user name, password, project path, and feature service name are in this file
 try:
+    import settings_ags_online
     import settings
 except:
     raise Exception(
         "Please copy the settings_template.py file to " +
-        "a file named settings.py and edit the values as required."
+        "a file named settings_ags_online.py and edit the values as required."
     )
 
 # --------------------------------------
@@ -26,25 +28,24 @@ SUMMARY_LOGFILE = os.path.join(settings.LOG_DIR, "hello_world_SUMMARY.txt")
 def main():
     from datetime import datetime
     import shutil
-    import arcpy
-    from arcpy import env
-    from arcpy_extensions import server_admin
-    from arcgisscripting import ExecuteError
+    import update_ags_online_fs
+
+    # from arcpy_extensions import server_admin
+    #from arcgisscripting import ExecuteError
 
     start = datetime.now()
     LOGGER.log(15, "\n\n--------------------------------------------------------------\n")
     LOGGER.log(15, "Started at {0}.".format(start))
 
     #print(sys.path)
-	
-    servicefoldernames = ['AWDB_ALL', 'AWDB_ACTIVE', 'AWDB_INACTIVE']
-    print("Connecting to server admin and stopping all services in {0} folder(s)...".format(servicefoldernames))
-    agsconnection = server_admin.AgsAdmin.connectWithoutToken(
-            settings.SERVER_ADDRESS,
-            settings.SERVER_PORT,
-            settings.SERVER_USER,
-            settings.SERVER_PASS,
-        )
+    # This list will be produced by the wfsupdatelist in the get_AWDB_stations module when this is all wired together
+    wfsupdatelist = ["C:\workspace\awdb-retrieve\temp\awdb_temp.gdb\stations_SNTL"]
+    for shapefile in wfsupdatelist:
+      for suffix in settings_ags_online.WFS_SUFFIXES:
+        next_service = os.path.basename(shapefile) + "_" + suffix
+        LOGGER.log(15, "About to update {0}.".format(next_service))
+        update_ags_online_fs.update_feature_services(settings_ags_online.PROJECT_PATH, next_service)
+    
     return 0
 
 

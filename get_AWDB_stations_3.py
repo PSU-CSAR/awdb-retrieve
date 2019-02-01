@@ -43,7 +43,7 @@ __DEBUG__ = False  # true outputs debug-level messages to stderr
 
 # NRCS AWDB network codes to download
 # NETWORKS = ["SNTL", "SNOW", "USGS", "COOP", "SCAN", "SNTLT", "OTHER", "BOR",
-            "MPRC", "MSNT"]
+#            "MPRC", "MSNT"]
 NETWORKS = ["SNTL"]
 
 ## Dictionaries of the station fields
@@ -527,6 +527,19 @@ def archive_GDB_FC(fc, outdir):
 
     return zippath
 
+def save_shapefile_FC(fc, outdir):
+    """
+    Copies an input FC from a geodatabase into a specified folder in shapefile format.
+
+    Requires: fc -- the feature class in a GDB to archive as a zip
+              outdir -- the output location for the shapefile
+
+    """
+    from arcpy import CopyFeatures_management
+
+    fc_name = os.path.basename(fc)
+
+    CopyFeatures_management(fc, os.path.join(outdir, fc_name))
 
 def replace_wfs_data(newdata, target_workspace):
     """
@@ -937,10 +950,13 @@ def main():
             pass
 
         try:
-            LOGGER.info("Archiving the data to the FTP site...")
-            archive_GDB_FC(projectedfc.getOutput(0),
-                           settings.ARCHIVE_WORKSPACE)
-            write_to_summary_log("{}: stations_{} archived OK".format(datetime.now(), network))
+            LOGGER.info("Saving the data to a shapefile ...")
+            outputPath = os.path.join(settings.SHAPEFILE_DIR, network) 
+            # archive_GDB_FC(projectedfc.getOutput(0),
+            #                settings.ARCHIVE_WORKSPACE)
+            save_shapefile_FC(projectedfc.getOutput(0),
+                              outputPath)
+            write_to_summary_log("{}: stations_{} saved OK".format(datetime.now(), network))
         except Exception as e:
             LOGGER.log(15, e)
             LOGGER.log(15, traceback.format_exc())

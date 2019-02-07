@@ -49,3 +49,11 @@ MAX_REQUEST = 250
 
 # number of attempts to retry getting station
 RETRY_COUNT = 2
+
+## ArcGIS Online Settings
+USER = # ArcGIS Online user name
+PASSWORD = # ArcGIS Online password
+## Path to ArcGIS Pro project that contains the maps
+PROJECT_PATH = os.path.join(repo,r"projects\awdb\awdb.aprx")
+# Suffixes for feature services
+WFS_SUFFIXES = ["ALL", "ACTIVE", "INACTIVE"]

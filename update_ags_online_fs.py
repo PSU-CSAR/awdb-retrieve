@@ -6,11 +6,11 @@ from arcgis.gis import GIS
 # load settings from settings_ags_online.py
 # user name, password, project path, and feature service name are in this file
 try:
-    import settings_ags_online
+    import settings
 except:
     raise Exception(
         "Please copy the settings_template.py file to " +
-        "a file named settings_ags_online.py and edit the values as required."
+        "a file named settings.py and edit the values as required."
     )
 
 ### Start setting variables
@@ -28,8 +28,8 @@ shrGroups = ""
 def update_feature_services(project_path, sd_fs_name):
     # Local paths to create temporary content
     relPath = sys.path[0]
-    sddraft = os.path.join(settings_ags_online.repo, "temp\WebUpdate.sddraft")
-    sd = os.path.join(settings_ags_online.repo, "temp\WebUpdate.sd")
+    sddraft = os.path.join(settings.repo, "temp\WebUpdate.sddraft")
+    sd = os.path.join(settings.repo, "temp\WebUpdate.sd")
 
     # Create a new SDDraft and stage to SD
     print("Creating SD file")
@@ -40,11 +40,11 @@ def update_feature_services(project_path, sd_fs_name):
     arcpy.StageService_server(sddraft, sd)
 
     print("Connecting to {}".format(portal))
-    gis = GIS(portal, settings_ags_online.USER, settings_ags_online.PASSWORD)
+    gis = GIS(portal, settings.AGO_USER, settings.AGO_PASSWORD)
 
     # Find the SD, update it, publish /w overwrite and set sharing and metadata
     print("Search for original SD on portal...")
-    sdItem = gis.content.search("{} AND owner:{}".format(sd_fs_name, settings_ags_online.USER), item_type="Service Definition")[0]
+    sdItem = gis.content.search("{} AND owner:{}".format(sd_fs_name, settings.AGO_USER), item_type="Service Definition")[0]
     print("Found SD: {}, ID: {} n Uploading and overwriting…".format(sdItem.title, sdItem.id))
     sdItem.update(data=sd)
     print("Overwriting existing feature service...")

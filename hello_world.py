@@ -4,12 +4,11 @@ import logging
 # load settings from settings_ags_online.py
 # user name, password, project path, and feature service name are in this file
 try:
-    import settings_ags_online
     import settings
 except:
     raise Exception(
         "Please copy the settings_template.py file to " +
-        "a file named settings_ags_online.py and edit the values as required."
+        "a file named settings.py and edit the values as required."
     )
 
 # --------------------------------------
@@ -41,10 +40,10 @@ def main():
     # This list will be produced by the wfsupdatelist in the get_AWDB_stations module when this is all wired together
     wfsupdatelist = ["C:\workspace\awdb-retrieve\temp\awdb_temp.gdb\stations_SNTL"]
     for shapefile in wfsupdatelist:
-      for suffix in settings_ags_online.WFS_SUFFIXES:
+      for suffix in settings.WFS_SUFFIXES:
         next_service = os.path.basename(shapefile) + "_" + suffix
         LOGGER.log(15, "About to update {0}.".format(next_service))
-        update_ags_online_fs.update_feature_services(settings_ags_online.PROJECT_PATH, next_service)
+        update_ags_online_fs.update_feature_services(settings.PRO_PROJECT_PATH, next_service)
     
     return 0
 

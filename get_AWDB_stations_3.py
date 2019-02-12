@@ -541,6 +541,32 @@ def save_shapefile_FC(fc, outdir):
 
     CopyFeatures_management(fc, os.path.join(outdir, fc_name))
 
+    return os.path.join(outdir, fc_name)
+
+def create_shapefile_variants(inpath):
+    """
+    Copies an input FC applying timestamp filters to create active and inactive shapefiles
+
+    Requires: inpath -- the path of the source feature class with all records
+              outdir -- the output location for the shapefile
+
+    """
+    from arcpy import FeatureClassToFeatureClass_conversion
+
+    fc_name = os.path.basename(inpath) + ".shp"
+    inactive_fc_name = "inactive_" + fc_name
+    active_fc_name = "active_" + fc_name
+
+    sourcePath = inpath + ".shp"
+    FeatureClassToFeatureClass_conversion(sourcePath, 
+                                          os.path.dirname(inpath), 
+                                          inactive_fc_name, " enddate <> timestamp '2100-01-01 00:00:00'")
+
+    FeatureClassToFeatureClass_conversion(sourcePath, 
+                                          os.path.dirname(inpath), 
+                                          active_fc_name, " enddate = timestamp '2100-01-01 00:00:00'")
+
+
 def replace_wfs_data(newdata, target_workspace):
     """
     Copy the new FC into the target workspace.
@@ -952,9 +978,7 @@ def main():
         try:
             LOGGER.info("Saving the data to a shapefile ...")
             outputPath = os.path.join(settings.SHAPEFILE_DIR, network) 
-            # archive_GDB_FC(projectedfc.getOutput(0),
-            #                settings.ARCHIVE_WORKSPACE)
-            save_shapefile_FC(projectedfc.getOutput(0),
+            source_path = save_shapefile_FC(projectedfc.getOutput(0),
                               outputPath)
             write_to_summary_log("{}: stations_{} saved OK".format(datetime.now(), network))
         except Exception as e:
@@ -962,7 +986,18 @@ def main():
             LOGGER.log(15, traceback.format_exc())
             LOGGER.error("Failed to archive the data.")
         else:
-            archiveerror -= 1  # exectued successfully, so no error
+            archiveerror -= 1  # executed successfully, so no error
+
+        try:
+            LOGGER.info("Copying the data to inactive/active shapefiles ...")
+            create_shapefile_variants(source_path)
+            write_to_summary_log("{}: stations_{} copied for inactive and active".format(datetime.now(), network))
+        except Exception as e:
+            LOGGER.log(15, e)
+            LOGGER.log(15, traceback.format_exc())
+            LOGGER.error("Failed to make copies for inactive and active.")
+        else:
+            archiveerror -= 1  # executed successfully, so no error
 
         LOGGER.info("Adding data to WFS update list...")
         wfsupdatelist.append(projectedfc.getOutput(0))

@@ -1,18 +1,18 @@
 # --------------------------------------------------------------------
 # NAME:     get_AWDB_stations.py
-# AUTHOR:   Jarrett Keifer
-# DATE:     11/13/2014
+# AUTHOR:   Jarrett Keifer and Lesley Bross
+# DATE:     11/13/2014 Updated 02/15/2019
 #
 # DESC:     Downloads SNOTEL, Snow Course, and USGS stations from the
 #           NRCS Air-Water Database, reprojects them, writes them to
-#           an SDE database, then publishes them to a web service.
+#           shapefiles, then publishes them feature services on ArcGIS Online
 #
 # USAGE:    The script requires no arguments, but some key constants
 #           need to set in the settings.py file. Copy the
 #           settings_template.py file with the namr settings.py and
 #           edit as reqiured.
 #
-#           Run with 64-bit python install due to problem reading SDE.
+#           Run with python 3
 # --------------------------------------------------------------------
 
 # some import statements in functions to speed process generation
@@ -88,10 +88,6 @@ STATION_ID_FIELD = FIELDS[13]["field_name"]
 QUEUE_DONE = "DONE"
 MESSAGE_CODE = "MSG"
 
-## WFS service settings
-# name of the folders containing all the AWDB web services
-WFS_SERVICE_FOLDERS = ["AWDB_ALL", "AWDB_ACTIVE", "AWDB_INACTIVE"]
-
 ## Logging constants
 # contains debug info
 FULL_LOGFILE = os.path.join(settings.LOG_DIR, "AWDB_LOG.txt")
@@ -108,14 +104,6 @@ TEMP_GDB_NAME = "awdb_temp"
 # -------------------------------
 
 # LOGGING IS SETUP AFTER THE MAIN CHECK BECAUSE OF MULTIPROCESSING
-
-
-# -------------------------------
-#          ERROR CLASSES
-# -------------------------------
-
-class SDEError(Exception):
-    pass
 
 
 # -------------------------------
@@ -587,111 +575,6 @@ def replace_wfs_data(newdata, target_workspace):
         )
     )
 
-
-def update_all_wfs(fcstoupdate, target_workspace, servicefoldernames):
-    """
-    Stops all web services in a folder on the server to remove all data locks.
-    For all new data, write that data to SDE, replacing the old web service data.
-    On any exception or if successful, re-start all services in the folder.
-
-    Requires: fcstoupdate -- a list of the new FCs to overwrite the data in SDE
-              target_worksapce -- the SDE FDS where the web service data lives
-              servicefoldername -- the name of the folder of AWDB web services
-                                   e.g. "AWDB"
-
-    Returns:  errorcount -- the number of FCs that were not copied successfully
-    """
-
-    from arcpy_extensions import server_admin
-
-    if not fcstoupdate:
-        raise Exception("No FCs to update.")
-
-    errorcount = 0
-    errors = 0
-
-    try:
-        print("Connecting to server admin and stopping all services in {0} folder(s)...".format(servicefoldernames))
-        agsconnection = server_admin.AgsAdmin.connectWithoutToken(
-            settings.SERVER_ADDRESS,
-            settings.SERVER_PORT,
-            settings.SERVER_USER,
-            settings.SERVER_PASS,
-        )
-        for servicefoldername in servicefoldernames:
-            errors += agsconnection.stopAllServicesInFolder(servicefoldername)
-    except Exception as e:
-        if not e.message.startswith("No services were found in the folder"):
-            LOGGER.log(15, e)
-            LOGGER.log(15, traceback.format_exc())
-            raise Exception("Could not stop the WFS services in {0}.".format(servicefoldername))
-            return
-    else:
-        if errors:
-            for servicefoldername in servicefoldernames:
-                agsconnection.startAllServicesInFolder(servicefoldername)
-            raise Exception("Failed to stop all services in {0}. Tried to restart then aborted.".format(servicefoldername))
-
-    for newdata in fcstoupdate:
-        try:
-            replace_wfs_data(newdata, target_workspace)
-        except Exception as e:
-            LOGGER.log(15, e)
-            LOGGER.log(15, traceback.format_exc())
-            errorcount += 1
-
-    if errorcount:
-        LOGGER.error("Failed to update one or more wfs data sources.")
-
-    LOGGER.info("Restarting stoppped services...")
-    try:
-        for servicefoldername in servicefoldernames:
-            agsconnection.startAllServicesInFolder(servicefoldername)
-    except Exception as e:
-        if not e.message.startswith("No services were found in the folder"):
-            LOGGER.log(15, e)
-            LOGGER.log(15, traceback.format_exc())
-            errorcount += 1
-
-    return errorcount
-
-
-def validateSDE(sdeconnection):
-    """
-    Checks to see if the SDE connection file exists.
-
-    Requires: sdeconnection -- the path to a SDE connection file
-
-    Returns: True if the connection exists
-    """
-    from arcpy import Exists
-
-    if not Exists(sdeconnection):
-        raise SDEError("SDE connection invalid or inaccessible.")
-
-    return True
-
-
-def validateFDS(sdeconnection, fds, spatialref="#"):
-    """
-    Checks to see if an FDS exists, and creates it if not.
-
-    Requires: sdeconnection -- the path to a SDE connection file
-              fds -- the name of the FDS
-
-    Optional: spatialref -- the spatialref to use for the FDS
-                            DEFAULT: the ArcGIS default
-
-    Returns:  True if successful
-    """
-    from arcpy import Exists, CreateFeatureDataset_management
-
-    if not Exists(os.path.join(sdeconnection, fds)):
-        CreateFeatureDataset_management(sdeconnection, fds, spatialref)
-
-    return True
-
-
 def create_temp_workspace(directory, name, is_gdb=True):
     """
     Creates a temp workspace for processing. If is_gdb, will create a GDB.
@@ -856,7 +739,6 @@ def main():
     import shutil
     import arcpy
     from arcpy import env
-    from arcgisscripting import ExecuteError
 
     start = datetime.now()
     LOGGER.log(15, "\n\n--------------------------------------------------------------\n")
@@ -867,36 +749,6 @@ def main():
     unprjSR = arcpy.SpatialReference(4326)
     # spatial ref WKID 102039: USA_Contiguous_Albers_Equal_Area_Conic_USGS_version
     prjSR = arcpy.SpatialReference(102039)
-
-    # ensure SDE connection is valid
-    #try:
-    #    LOGGER.log(15, "Validating DB connection...")
-    #    validateSDE(settings.SDE_WORKSPACE)
-    #    target_workspace = settings.SDE_WORKSPACE
-    #except Exception as e:
-    #    LOGGER.log(15, e)
-    #    LOGGER.log(15, traceback.format_exc())
-    #    LOGGER.error("Fatal Error: DB connection not valid. Aborting...")
-    #    return 101
-
-    # if using a feature dataset, ensure exists
-    #if settings.FDS_NAME:
-    #    target_workspace = os.path.join(
-    #        settings.SDE_WORKSPACE,
-    #        settings.FDS_SDE_PREFIX + settings.FDS_NAME,
-    #    )
-    #    try:
-    #        LOGGER.log(15, "Validating feature dataset in DB...")
-    #        validateFDS(
-    #            settings.SDE_WORKSPACE,
-    #            settings.FDS_NAME,
-    #            spatialref=prjSR,
-    #        )
-    #    except Exception as e:
-    #        LOGGER.log(15, e)
-    #        LOGGER.log(15, traceback.format_exc())
-    #        LOGGER.error("Fatal Error: Feature Dataset not valid. Aborting...")
-    #        return 102
 
     # arcpy variable to allow overwriting existing files
     env.overwriteOutput = True
@@ -1006,20 +858,7 @@ def main():
 
     if wfsupdatelist:
         LOGGER.info("\nUpdating WFSs in update list...")
-        try:
-            updateerrors = update_all_wfs(
-                wfsupdatelist,
-                target_workspace,
-                WFS_SERVICE_FOLDERS,
-            )
-            if updateerrors:
-                LOGGER.error("\nUpdating failed with errors. Aborting...")
-                return 201
-        except Exception as e:
-            LOGGER.log(15, e)
-            LOGGER.log(15, traceback.format_exc())
-            LOGGER.error("\nFailed to update the web services. Aborting...")
-            return 200
+
     else:
         LOGGER.error("\nNo web services to update. Aborting...")
         return 300

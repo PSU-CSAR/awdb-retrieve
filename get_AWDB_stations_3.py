@@ -44,7 +44,8 @@ __DEBUG__ = False  # true outputs debug-level messages to stderr
 # NRCS AWDB network codes to download
 # NETWORKS = ["SNTL", "SNOW", "USGS", "COOP", "SCAN", "SNTLT", "OTHER", "BOR",
 #            "MPRC", "MSNT"]
-NETWORKS = ["SNTL"]
+# We are only updating these 3 networks for now
+NETWORKS = ["USGS"]
 
 ## Dictionaries of the station fields
 # these fields are required, and are geometry,
@@ -531,9 +532,9 @@ def save_shapefile_FC(fc, outdir):
 
     return os.path.join(outdir, fc_name)
 
-def create_shapefile_variants(inpath):
+def create_active_only_FC(inpath):
     """
-    Copies an input FC applying timestamp filters to create active and inactive shapefiles
+    Copies an input FC applying timestamp filters to create active-only shapefiles
 
     Requires: inpath -- the path of the source feature class with all records
               outdir -- the output location for the shapefile
@@ -542,14 +543,9 @@ def create_shapefile_variants(inpath):
     from arcpy import FeatureClassToFeatureClass_conversion
 
     fc_name = os.path.basename(inpath) + ".shp"
-    inactive_fc_name = "inactive_" + fc_name
     active_fc_name = "active_" + fc_name
 
     sourcePath = inpath + ".shp"
-    FeatureClassToFeatureClass_conversion(sourcePath, 
-                                          os.path.dirname(inpath), 
-                                          inactive_fc_name, " enddate <> timestamp '2100-01-01 00:00:00'")
-
     FeatureClassToFeatureClass_conversion(sourcePath, 
                                           os.path.dirname(inpath), 
                                           active_fc_name, " enddate = timestamp '2100-01-01 00:00:00'")
@@ -623,12 +619,11 @@ def get_USGS_metadata(usgs_fc):
     """
 
     import urllib
-    import urllib2
     import gzip
     from re import search
     from arcpy import ListFields, AddField_management
     from arcpy.da import SearchCursor, UpdateCursor
-    from StringIO import StringIO
+    import io
 
     # check for area field and add if missing
     fields = ListFields(usgs_fc)
@@ -650,23 +645,23 @@ def get_USGS_metadata(usgs_fc):
                 stationIDs.append(sid)
 
     # setup and get the HTTP request
-    request = urllib2.Request(
+    request = urllib.request.Request(
         settings.USGS_URL,
-        urllib.urlencode({
+        urllib.parse.urlencode({
             "format": "rdb",  # get the data in USGS rdb format
             "sites": ",".join(stationIDs),  # the site IDs to get, separated by commas
-            "siteOutput": "expanded",  # expanded output includes basin area
+            "siteOutput": "expanded"  # expanded output includes basin area
             #"modifiedSince": "P" + str(SCRIPT_FREQUENCY) + "D"  # only get records modified since last run
-        })
+        }).encode('utf-8')
     )
 
     # allow gzipped response
     request.add_header('Accept-encoding', 'gzip')
-    response = urllib2.urlopen(request)
+    response = urllib.request.urlopen(request)
 
     # check to see if response is gzipped and decompress if yes
     if response.info().get('Content-Encoding') == 'gzip':
-        buf = StringIO(response.read())
+        buf = io.BytesIO(response.read())
         data = gzip.GzipFile(fileobj=buf)
     else:
         data = response
@@ -674,9 +669,10 @@ def get_USGS_metadata(usgs_fc):
     # parse the response and create a dictionary keyed on the station ID
     stationAreas = {}
     for line in data.readlines():
-        if line.startswith("USGS"):
+        line = line.decode('utf-8')
+        if line.startswith('USGS'):
             # data elements in line (station record) are separated by tabs
-            line = line.split("\t")
+            line = line.split('\t')
             # the 2nd element is the station ID, 3rd is the name,
             # and the 30th is the area
             # order in the tuple is important,
@@ -773,6 +769,7 @@ def main():
 
     wfsupdatelist = []  # list of wfs data to update
     archiveerror = 0
+    copyerror = 0
 
     # process stations in each network
     for network in NETWORKS:
@@ -780,6 +777,7 @@ def main():
         fc_name = "stations_" + network
         try_count = 0
         archiveerror += 1  # add error to be removed after successful execution
+        copyerror += 1 # add error to be removed after successful execution
 
         while try_count <= settings.RETRY_COUNT:
             try:
@@ -842,14 +840,14 @@ def main():
 
         try:
             LOGGER.info("Copying the data to inactive/active shapefiles ...")
-            create_shapefile_variants(source_path)
+            create_active_only_FC(source_path)
             write_to_summary_log("{}: stations_{} copied for inactive and active".format(datetime.now(), network))
         except Exception as e:
             LOGGER.log(15, e)
             LOGGER.log(15, traceback.format_exc())
             LOGGER.error("Failed to make copies for inactive and active.")
         else:
-            archiveerror -= 1  # executed successfully, so no error
+            copyerror -= 1  # executed successfully, so no error
 
         LOGGER.info("Adding data to WFS update list...")
         wfsupdatelist.append(projectedfc.getOutput(0))
@@ -866,8 +864,11 @@ def main():
     if archiveerror:
         LOGGER.info("\nOne or more FCs were not successfully archived. Script is aborting before temp data is removed...")
         write_to_summary_log("{}: {} web services FAILED".format(datetime.now(), archiveerror))
+    elif copyerror:
+        LOGGER.info("\nActive stations files were not created for one or more FCs.")
+        write_to_summary_log("{}: {} web services FAILED".format(datetime.now(), archiveerror))
     else:
-        LOGGER.info("\nAll processes exectued successfully.")
+        LOGGER.info("\nAll processes executed successfully.")
         write_to_summary_log("{}: all web services updated OK".format(datetime.now()))
         try:
             LOGGER.info("Removing temp data...")

@@ -51,9 +51,10 @@ MAX_REQUEST = 250
 RETRY_COUNT = 2
 
 ## ArcGIS Online Settings
-USER = # ArcGIS Online user name
-PASSWORD = # ArcGIS Online password
+AGO_PORTAL = "http://www.arcgis.com"
+AGO_USER = # ArcGIS Online user name
+AGO_PASSWORD = # ArcGIS Online password
 ## Path to ArcGIS Pro project that contains the maps
-PROJECT_PATH = os.path.join(repo,r"projects\awdb\awdb.aprx")
-# Suffixes for feature services
-WFS_SUFFIXES = ["ALL", "ACTIVE", "INACTIVE"]
+PRO_PROJECT_PATH = os.path.join(repo,r"projects\awdb\awdb.aprx")
+## Suffixes for feature services
+AGO_SUFFIX_ACTIVE = "ACTIVE"

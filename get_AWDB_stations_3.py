@@ -521,12 +521,13 @@ def archive_GDB_FC(fc, outdir):
 
     return zippath
 
-def save_shapefile_FC(fc, outdir):
+def save_FC(fc, outdir):
     """
     Copies an input FC from a geodatabase into a specified folder in shapefile format.
+    Saves an input FC into a specified folder (outdir)
 
-    Requires: fc -- the feature class in a GDB to archive as a zip
-              outdir -- the output location for the shapefile
+    Requires: fc -- the feature class to save
+              outdir -- the output location for the feature class
 
     """
     from arcpy import CopyFeatures_management
@@ -542,16 +543,15 @@ def create_active_only_FC(inpath):
     Copies an input FC applying timestamp filters to create active-only shapefiles
 
     Requires: inpath -- the path of the source feature class with all records
-              outdir -- the output location for the shapefile
+              outdir -- the output location for the FGDB
 
     """
     from arcpy import FeatureClassToFeatureClass_conversion
 
-    fc_name = os.path.basename(inpath) + ".shp"
+    fc_name = os.path.basename(inpath)
     active_fc_name = "active_" + fc_name
 
-    sourcePath = inpath + ".shp"
-    FeatureClassToFeatureClass_conversion(sourcePath, 
+    FeatureClassToFeatureClass_conversion(inpath, 
                                           os.path.dirname(inpath), 
                                           active_fc_name, " enddate = timestamp '2100-01-01 00:00:00'")
 
@@ -831,10 +831,9 @@ def main():
             pass
 
         try:
-            LOGGER.info("Saving the data to a shapefile ...")
-            outputPath = os.path.join(settings.SHAPEFILE_DIR, network) 
-            source_path = save_shapefile_FC(projectedfc.getOutput(0),
-                              outputPath)
+            LOGGER.info("Saving the data to a FGDB ...")
+            source_path = save_FC(projectedfc.getOutput(0),
+                              settings.AWDB_FGDB_PATH)
             write_to_summary_log("{}: stations_{} saved OK".format(datetime.now(), network))
         except Exception as e:
             LOGGER.log(15, e)
@@ -844,7 +843,7 @@ def main():
             archiveerror -= 1  # executed successfully, so no error
 
         try:
-            LOGGER.info("Copying the data to active shapefiles ...")
+            LOGGER.info("Copying the data to active FGDB ...")
             create_active_only_FC(source_path)
             write_to_summary_log("{}: stations_{} copied for active".format(datetime.now(), network))
         except Exception as e:

@@ -64,13 +64,14 @@ FIELDS = [
     {"field_name": "fipsCountyCd",        "field_type": "SHORT"},                     # 5
     {"field_name": "fipsStateNumber",     "field_type": "SHORT"},                     # 6
     {"field_name": "huc",                 "field_type": "TEXT", "field_length": 20},  # 7
-    {"field_name": "hud",                 "field_type": "TEXT", "field_length": 20},  # 8
-    {"field_name": "name",                "field_type": "TEXT", "field_length": 100}, # 9
-    {"field_name": "shefId",              "field_type": "TEXT", "field_length": 20},  # 10
-    {"field_name": "stationDataTimeZone", "field_type": "DOUBLE"},                    # 11
-    {"field_name": "stationTimeZone",     "field_type": "DOUBLE"},                    # 12
-    {"field_name": "stationTriplet",      "field_type": "TEXT", "field_length": 50},  # 13
-    {"field_name": "elevation",           "field_type": "DOUBLE"},                    # 14
+    {"field_name": "name",                "field_type": "TEXT", "field_length": 100}, # 8
+    {"field_name": "shefId",              "field_type": "TEXT", "field_length": 20},  # 9
+    {"field_name": "stationDataTimeZone", "field_type": "DOUBLE"},                    # 10
+    {"field_name": "stationTimeZone",     "field_type": "DOUBLE"},                    # 11
+    {"field_name": "stationTriplet",      "field_type": "TEXT", "field_length": 50},  # 12
+    {"field_name": "elevation",           "field_type": "DOUBLE"},                    # 13
+    {"field_name": "latitude",            "field_type": "FLOAT"},                     # 14
+    {"field_name": "longitude",           "field_type": "FLOAT"}                      # 15
 ]
 
 ## USGS metadata retrival constants
@@ -81,7 +82,7 @@ NEW_FIELDS = [
     ("USGSname", "TEXT"),
 ]
 # the stationTriplet field name (used for the ID) is defined in FIELDS above
-STATION_ID_FIELD = FIELDS[13]["field_name"]
+STATION_ID_FIELD = FIELDS[12]["field_name"]
 
 ## Message inserted into queue to signal end of logging message
 QUEUE_DONE = "DONE"
@@ -404,15 +405,17 @@ def get_network_stations(networkCode, fc_name, spatialref, workspace="in_memory"
                       FIELDS[4]["field_name"],
                       FIELDS[5]["field_name"],
                       FIELDS[6]["field_name"],
-                      FIELDS[8]["field_name"],
+                      FIELDS[7]["field_name"],
                       "SHAPE@Y",
                       "SHAPE@X",
+                      FIELDS[8]["field_name"],
                       FIELDS[9]["field_name"],
                       FIELDS[10]["field_name"],
                       FIELDS[11]["field_name"],
                       FIELDS[12]["field_name"],
                       FIELDS[13]["field_name"],
                       FIELDS[14]["field_name"],
+                      FIELDS[15]["field_name"],
                       )
 
     countInserted = 0
@@ -444,15 +447,17 @@ def get_network_stations(networkCode, fc_name, spatialref, workspace="in_memory"
                               station[FIELDS[4]["field_name"]],
                               station[FIELDS[5]["field_name"]],
                               station[FIELDS[6]["field_name"]],
-                              station[FIELDS[8]["field_name"]],
+                              station[FIELDS[7]["field_name"]],
                               station["latitude"],
                               station["longitude"],
+                              station[FIELDS[8]["field_name"]],
                               station[FIELDS[9]["field_name"]],
                               station[FIELDS[10]["field_name"]],
                               station[FIELDS[11]["field_name"]],
                               station[FIELDS[12]["field_name"]],
                               station[FIELDS[13]["field_name"]],
                               station[FIELDS[14]["field_name"]],
+                              station[FIELDS[15]["field_name"]],
                               ))
             countInserted += 1
 

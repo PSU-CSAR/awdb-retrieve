@@ -42,10 +42,9 @@ except:
 __DEBUG__ = False  # true outputs debug-level messages to stderr
 
 # NRCS AWDB network codes to download
-# NETWORKS = ["SNTL", "SNOW", "USGS", "COOP", "SCAN", "SNTLT", "OTHER", "BOR",
-#            "MPRC", "MSNT"]
-# We are only updating these 3 networks for now
-NETWORKS = ["SNTL", "SNOW", "USGS"]
+NETWORKS = ["SNTL", "SNOW", "USGS", "COOP", "SCAN", "SNTLT", "OTHER", "BOR",
+            "MPRC", "MSNT"]
+
 
 ## Dictionaries of the station fields
 # these fields are required, and are geometry,
@@ -740,6 +739,7 @@ def main():
     import shutil
     import arcpy
     from arcpy import env
+    import update_ags_online_fs
 
     start = datetime.now()
     LOGGER.log(15, "\n\n--------------------------------------------------------------\n")
@@ -859,7 +859,11 @@ def main():
         # end processing of network
 
     if wfsupdatelist:
-        LOGGER.info("\nUpdating WFSs in update list...")
+        LOGGER.info("\nUpdating AGOL feature services in update list...")
+        for wfspath in wfsupdatelist:
+          fc_name = os.path.basename(wfspath) + "_" + settings.AGO_SUFFIX_ACTIVE
+          LOGGER.log(15, "About to update {0}.".format(fc_name))
+          update_ags_online_fs.update_feature_services(settings.PRO_PROJECT_PATH, fc_name)
 
     else:
         LOGGER.error("\nNo web services to update. Aborting...")

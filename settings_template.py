@@ -20,7 +20,7 @@ ARCHIVE_WORKSPACE = r"C:\inetpub\ftproot\AWDB\Stations"  # zip each shapefile he
 TEMP_WORKSPACE = os.path.join(repo, "temp")  # location for intermediate files
 LOG_DIR = os.path.join(repo, "log")  # location for log files
 MAP_DIR = os.path.join(repo, "maps")  # location for map mxds
-
+AWDB_FGDB_PATH =  os.path.join(repo, "awdb-stations.gdb")  # location for awdb geodatabase storing feature classes
 
 ## SDE target database -- for WFSs
 SDE_WORKSPACE = os.path.join(repo, "awdb.sde")  # ownership SDE database connection

@@ -20,7 +20,7 @@ ARCHIVE_WORKSPACE = r"C:\inetpub\ftproot\AWDB\Stations"  # zip each shapefile he
 TEMP_WORKSPACE = os.path.join(repo, "temp")  # location for intermediate files
 LOG_DIR = os.path.join(repo, "log")  # location for log files
 MAP_DIR = os.path.join(repo, "maps")  # location for map mxds
-
+AWDB_FGDB_PATH =  os.path.join(repo, "awdb-stations.gdb")  # location for awdb geodatabase storing feature classes
 
 ## SDE target database -- for WFSs
 SDE_WORKSPACE = os.path.join(repo, "awdb.sde")  # ownership SDE database connection
@@ -49,3 +49,12 @@ MAX_REQUEST = 250
 
 # number of attempts to retry getting station
 RETRY_COUNT = 2
+
+## ArcGIS Online Settings
+AGO_PORTAL = "http://www.arcgis.com"
+AGO_USER = # ArcGIS Online user name
+AGO_PASSWORD = # ArcGIS Online password
+## Path to ArcGIS Pro project that contains the maps
+PRO_PROJECT_PATH = os.path.join(repo,r"projects\awdb\awdb.aprx")
+## Suffixes for feature services
+AGO_SUFFIX_ACTIVE = "ACTIVE"

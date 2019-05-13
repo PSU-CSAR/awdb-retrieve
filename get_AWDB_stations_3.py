@@ -91,9 +91,9 @@ MESSAGE_CODE = "MSG"
 
 ## Logging constants
 # contains debug info
-FULL_LOGFILE = os.path.join(settings.LOG_DIR, "AWDB_LOG.txt")
+FULL_LOGFILE = os.path.join(settings.LOG_DIR, "AWDB_LOG_3.txt")
 # records processed OK/Failed only
-SUMMARY_LOGFILE = os.path.join(settings.LOG_DIR, "AWDB_SUMMARY.txt")
+SUMMARY_LOGFILE = os.path.join(settings.LOG_DIR, "AWDB_SUMMARY_3.txt")
 
 ## Other
 # name of temp GDB

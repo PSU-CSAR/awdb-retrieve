@@ -207,3 +207,5 @@ the bin directory, renaming it curl-ca-bundle.crt. Voila! cURL began working.
 
 Interestingly, this also fixed the python problem. I guess having this CA bundle
 on the path is enough to allow the python SSL install to use it. Thank goodness.
+
+Test checkout

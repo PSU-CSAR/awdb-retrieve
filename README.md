@@ -35,6 +35,9 @@ python to which installation of these packages is desired.
 If not using the the ArcGIS python install (as is recommended), you
 will need to create a .pth file to link your python with the arcpy libs.
 
+Updates for Python 3/ArcGIS Pro
+------------------------
+[wiki article](https://github.com/PSU-CSAR/awdb-retrieve/wiki/Publishing-AWDB-data-to-ArcGIS-Online-with-ArcGIS-Pro-API)
 
 Brief Installation Guide
 ------------------------

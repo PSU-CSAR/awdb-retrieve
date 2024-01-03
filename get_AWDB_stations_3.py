@@ -802,16 +802,16 @@ def main():
             write_to_summary_log("{}: stations_{} processing FAILED".format(datetime.now(), network))
             continue
 
-        if network == "USGS":
-            LOGGER.info("USGS data requires area from USGS web service. Retreiving...")
-            try:
-                get_USGS_metadata(fc)
-            except Exception as e:
-                LOGGER.log(15, e)
-                LOGGER.log(15, traceback.format_exc())
-                LOGGER.error("Failed to retrieve the USGS area data. Could not continue.")
-                write_to_summary_log("{}: stations_{} processing FAILED".format(datetime.now(), network))
-                continue
+        #if network == "USGS":
+        #    LOGGER.info("USGS data requires area from USGS web service. Retreiving...")
+        #    try:
+        #        get_USGS_metadata(fc)
+        #    except Exception as e:
+        #        LOGGER.log(15, e)
+        #        LOGGER.log(15, traceback.format_exc())
+        #        LOGGER.error("Failed to retrieve the USGS area data. Could not continue.")
+        #        write_to_summary_log("{}: stations_{} processing FAILED".format(datetime.now(), network))
+        #        continue
 
         try:
             projectedfc = arcpy.Project_management(fc, os.path.join(templocation, fc_name), prjSR)  # from unprjSR to prjSR

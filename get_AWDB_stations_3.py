@@ -42,8 +42,9 @@ except:
 __DEBUG__ = False  # true outputs debug-level messages to stderr
 
 # NRCS AWDB network codes to download
-NETWORKS = ["SNTL", "SNOW", "USGS", "COOP", "SCAN", "SNTLT", "OTHER", "BOR",
-            "MPRC", "MSNT"]
+#NETWORKS = ["SNTL", "SNOW", "USGS", "COOP", "SCAN", "SNTLT", "OTHER", "BOR",
+            #"MPRC", "MSNT"]
+NETWORKS = ["USGS"]
 
 
 ## Dictionaries of the station fields
@@ -717,6 +718,32 @@ def get_USGS_metadata(usgs_fc):
             # no exception so data valid, update row
             cursor.updateRow(row)
 
+def create_forecast_point_ws():
+    from arcpy import CopyFeatures_management
+
+    LOGGER.info("create_forecast_point_ws...")
+    client = Client(settings.WDSL_URL)
+    # get list of station IDs in network
+    data = None
+    forecastIDs = [] 
+    data = client.service.getForecastPoints(networkCds="USGS",stateCds="MT",logicalAnd="true")
+    if data:
+      for station in data:
+          try:
+            forecastIDs.append(station["stationTriplet"])
+          except:
+            pass
+    numberofstations = len(data)
+    LOGGER.info('We processed %d records', numberofstations)
+    LOGGER.info('%d records in array', len(forecastIDs))
+    if "06024450:MT:USGS" in forecastIDs:
+      LOGGER.info("exist")
+    LOGGER.info(settings.AWDB_FGDB_PATH) 
+    sourceFc = os.path.join(settings.AWDB_FGDB_PATH, r"active_stations_USGS")
+    LOGGER.info(sourceFc) 
+    targetFc = os.path.join(settings.AWDB_FGDB_PATH, r"active_stations_FCST")
+    CopyFeatures_management(sourceFc, targetFc)
+
 
 def write_to_summary_log(message):
     """
@@ -858,6 +885,9 @@ def main():
 
         # end processing of network
 
+        # create forecast webservice
+        create_forecast_point_ws()
+        
     if wfsupdatelist:
         LOGGER.info("\nUpdating AGOL feature services in update list...")
         for wfspath in wfsupdatelist:

@@ -44,6 +44,7 @@ __DEBUG__ = False  # true outputs debug-level messages to stderr
 # NRCS AWDB network codes to download
 NETWORKS = ["SNTL", "SNOW", "USGS", "COOP", "SCAN", "SNTLT", "OTHER", "BOR",
             "MPRC", "MSNT"]
+#NETWORKS = ["USGS"]
 
 
 ## Dictionaries of the station fields
@@ -717,6 +718,77 @@ def get_USGS_metadata(usgs_fc):
             # no exception so data valid, update row
             cursor.updateRow(row)
 
+def create_forecast_point_ws():
+    from arcpy import CopyFeatures_management
+    import arcpy
+
+    bUSGSExists = False
+    bBORExists = False
+    LOGGER.info("create_forecast_point_ws...")
+
+    USGS_Active = "active_stations_USGS"
+    if arcpy.Exists(os.path.join(settings.AWDB_FGDB_PATH, USGS_Active)):
+        bUSGSExists = True
+    BOR_Active = "active_stations_BOR"
+    if arcpy.Exists(os.path.join(settings.AWDB_FGDB_PATH, BOR_Active)):
+        bBORExists = True
+    FCST_Active = "active_stations_FCST"
+
+    if (bUSGSExists and bBORExists):
+      client = Client(settings.WDSL_URL)
+      # get list of station IDs in network
+      data = None
+      forecastIDs = [] 
+      data = client.service.getForecastPoints(networkCds="USGS",logicalAnd="true")
+      if data:
+        for station in data:
+          try:
+            forecastIDs.append(station["stationTriplet"])
+          except:
+            pass
+      numberofstations = len(data)
+      LOGGER.info('We processed %d records', numberofstations)
+      LOGGER.info('%d records in array', len(forecastIDs))
+      BOR_Temp_Active = "temp_" + BOR_Active
+      sourceFc = os.path.join(settings.AWDB_FGDB_PATH, USGS_Active)
+      targetFc = os.path.join(settings.AWDB_FGDB_PATH, FCST_Active)
+      CopyFeatures_management(sourceFc, targetFc)
+      LOGGER.info("Before %d records", getCount(targetFc))
+      with arcpy.da.UpdateCursor(targetFc, ('stationTriplet')) as curs:
+          for row in curs:
+                test_triplet = row[0]
+                if (test_triplet not in forecastIDs):                
+                    curs.deleteRow()
+      LOGGER.info("After %d records", getCount(targetFc))
+      sourceFc = os.path.join(settings.AWDB_FGDB_PATH, BOR_Active)
+      targetFc = os.path.join(settings.AWDB_FGDB_PATH, BOR_Temp_Active)
+      CopyFeatures_management(sourceFc, targetFc)
+      forecastIDs.clear()
+      data = client.service.getForecastPoints(networkCds="BOR",logicalAnd="true")
+      if data:
+        for station in data:
+          try:
+            forecastIDs.append(station["stationTriplet"])
+          except:
+            pass
+      numberofstations = len(data)
+      LOGGER.info('%d records in array', len(forecastIDs))
+      with arcpy.da.UpdateCursor(targetFc, ('stationTriplet')) as curs:
+          for row in curs:
+                test_triplet = row[0]
+                if (test_triplet not in forecastIDs):                
+                    curs.deleteRow()
+      LOGGER.info("After %d records", getCount(targetFc))
+
+
+
+
+    else:
+      LOGGER.error("unable to locate {0} and or {1}. Forecast service will not be updated".format(USGS_Active, BOM_Active))
+
+def getCount(fc):
+    import arcpy
+    return int(arcpy.GetCount_management(fc).getOutput(0))
 
 def write_to_summary_log(message):
     """
@@ -802,16 +874,16 @@ def main():
             write_to_summary_log("{}: stations_{} processing FAILED".format(datetime.now(), network))
             continue
 
-        if network == "USGS":
-            LOGGER.info("USGS data requires area from USGS web service. Retreiving...")
-            try:
-                get_USGS_metadata(fc)
-            except Exception as e:
-                LOGGER.log(15, e)
-                LOGGER.log(15, traceback.format_exc())
-                LOGGER.error("Failed to retrieve the USGS area data. Could not continue.")
-                write_to_summary_log("{}: stations_{} processing FAILED".format(datetime.now(), network))
-                continue
+        #if network == "USGS":
+        #    LOGGER.info("USGS data requires area from USGS web service. Retreiving...")
+        #    try:
+        #        get_USGS_metadata(fc)
+        #    except Exception as e:
+        #        LOGGER.log(15, e)
+        #        LOGGER.log(15, traceback.format_exc())
+        #        LOGGER.error("Failed to retrieve the USGS area data. Could not continue.")
+        #        write_to_summary_log("{}: stations_{} processing FAILED".format(datetime.now(), network))
+        #        continue
 
         try:
             projectedfc = arcpy.Project_management(fc, os.path.join(templocation, fc_name), prjSR)  # from unprjSR to prjSR
@@ -858,6 +930,10 @@ def main():
 
         # end processing of network
 
+        # create forecast webservice
+        # Commenting out. Not ready to use yet
+        # create_forecast_point_ws()
+        
     if wfsupdatelist:
         LOGGER.info("\nUpdating AGOL feature services in update list...")
         for wfspath in wfsupdatelist:

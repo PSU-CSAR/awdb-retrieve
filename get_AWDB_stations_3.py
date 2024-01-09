@@ -720,30 +720,75 @@ def get_USGS_metadata(usgs_fc):
 
 def create_forecast_point_ws():
     from arcpy import CopyFeatures_management
+    import arcpy
 
+    bUSGSExists = False
+    bBORExists = False
     LOGGER.info("create_forecast_point_ws...")
-    client = Client(settings.WDSL_URL)
-    # get list of station IDs in network
-    data = None
-    forecastIDs = [] 
-    data = client.service.getForecastPoints(networkCds="USGS",stateCds="MT",logicalAnd="true")
-    if data:
-      for station in data:
+
+    USGS_Active = "active_stations_USGS"
+    if arcpy.Exists(os.path.join(settings.AWDB_FGDB_PATH, USGS_Active)):
+        bUSGSExists = True
+    BOR_Active = "active_stations_BOR"
+    if arcpy.Exists(os.path.join(settings.AWDB_FGDB_PATH, BOR_Active)):
+        bBORExists = True
+    FCST_Active = "active_stations_FCST"
+
+    if (bUSGSExists and bBORExists):
+      client = Client(settings.WDSL_URL)
+      # get list of station IDs in network
+      data = None
+      forecastIDs = [] 
+      data = client.service.getForecastPoints(networkCds="USGS",logicalAnd="true")
+      if data:
+        for station in data:
           try:
             forecastIDs.append(station["stationTriplet"])
           except:
             pass
-    numberofstations = len(data)
-    LOGGER.info('We processed %d records', numberofstations)
-    LOGGER.info('%d records in array', len(forecastIDs))
-    if "06024450:MT:USGS" in forecastIDs:
-      LOGGER.info("exist")
-    LOGGER.info(settings.AWDB_FGDB_PATH) 
-    sourceFc = os.path.join(settings.AWDB_FGDB_PATH, r"active_stations_USGS")
-    LOGGER.info(sourceFc) 
-    targetFc = os.path.join(settings.AWDB_FGDB_PATH, r"active_stations_FCST")
-    CopyFeatures_management(sourceFc, targetFc)
+      numberofstations = len(data)
+      LOGGER.info('We processed %d records', numberofstations)
+      LOGGER.info('%d records in array', len(forecastIDs))
+      BOR_Temp_Active = "temp_" + BOR_Active
+      sourceFc = os.path.join(settings.AWDB_FGDB_PATH, USGS_Active)
+      targetFc = os.path.join(settings.AWDB_FGDB_PATH, FCST_Active)
+      CopyFeatures_management(sourceFc, targetFc)
+      LOGGER.info("Before %d records", getCount(targetFc))
+      with arcpy.da.UpdateCursor(targetFc, ('stationTriplet')) as curs:
+          for row in curs:
+                test_triplet = row[0]
+                if (test_triplet not in forecastIDs):                
+                    curs.deleteRow()
+      LOGGER.info("After %d records", getCount(targetFc))
+      sourceFc = os.path.join(settings.AWDB_FGDB_PATH, BOR_Active)
+      targetFc = os.path.join(settings.AWDB_FGDB_PATH, BOR_Temp_Active)
+      CopyFeatures_management(sourceFc, targetFc)
+      forecastIDs.clear()
+      data = client.service.getForecastPoints(networkCds="BOR",logicalAnd="true")
+      if data:
+        for station in data:
+          try:
+            forecastIDs.append(station["stationTriplet"])
+          except:
+            pass
+      numberofstations = len(data)
+      LOGGER.info('%d records in array', len(forecastIDs))
+      with arcpy.da.UpdateCursor(targetFc, ('stationTriplet')) as curs:
+          for row in curs:
+                test_triplet = row[0]
+                if (test_triplet not in forecastIDs):                
+                    curs.deleteRow()
+      LOGGER.info("After %d records", getCount(targetFc))
 
+
+
+
+    else:
+      LOGGER.error("unable to locate {0} and or {1}. Forecast service will not be updated".format(USGS_Active, BOM_Active))
+
+def getCount(fc):
+    import arcpy
+    return int(arcpy.GetCount_management(fc).getOutput(0))
 
 def write_to_summary_log(message):
     """
@@ -886,7 +931,8 @@ def main():
         # end processing of network
 
         # create forecast webservice
-        create_forecast_point_ws()
+        # Commenting out. Not ready to use yet
+        # create_forecast_point_ws()
         
     if wfsupdatelist:
         LOGGER.info("\nUpdating AGOL feature services in update list...")

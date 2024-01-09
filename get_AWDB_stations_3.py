@@ -42,9 +42,9 @@ except:
 __DEBUG__ = False  # true outputs debug-level messages to stderr
 
 # NRCS AWDB network codes to download
-#NETWORKS = ["SNTL", "SNOW", "USGS", "COOP", "SCAN", "SNTLT", "OTHER", "BOR",
-            #"MPRC", "MSNT"]
-NETWORKS = ["USGS"]
+NETWORKS = ["SNTL", "SNOW", "USGS", "COOP", "SCAN", "SNTLT", "OTHER", "BOR",
+            "MPRC", "MSNT"]
+#NETWORKS = ["USGS"]
 
 
 ## Dictionaries of the station fields

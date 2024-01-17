@@ -719,7 +719,7 @@ def get_USGS_metadata(usgs_fc):
             cursor.updateRow(row)
 
 def create_forecast_point_ws():
-    from arcpy import CopyFeatures_management, AddField_management, Append_management, Delete_management, AddJoin_management, CalculateField_management
+    from arcpy import CopyFeatures_management, AddField_management, Append_management, Delete_management, AddJoin_management, CalculateField_management, RemoveJoin_management
     import arcpy
 
     bUSGSExists = False
@@ -784,26 +784,47 @@ def create_forecast_point_ws():
       tmpForecastFc = os.path.join(settings.AWDB_FGDB_PATH, FCST_Active_Temp)
       Append_management([os.path.join(settings.AWDB_FGDB_PATH, BOR_Active_Temp)], tmpForecastFc)
       Delete_management(os.path.join(settings.AWDB_FGDB_PATH, BOR_Active_Temp))
+      HUC2 = "huc2"
+      WINTER_START_MONTH = "winter_start_month"
+      WINTER_END_MONTH = "winter_end_month"
       FCST_FIELDS = [
-        {"field_name": "winter_start_month",             "field_type": "SHORT"},  # 0
-        {"field_name": "winter_end_month",               "field_type": "SHORT"},  # 1
-        {"field_name": "huc2",                           "field_type": "TEXT", "field_length": 2} #2
+        {"field_name": WINTER_START_MONTH,             "field_type": "SHORT"},  # 0
+        {"field_name": WINTER_END_MONTH,               "field_type": "SHORT"},  # 1
+        {"field_name": HUC2,                           "field_type": "TEXT", "field_length": 2} #2
       ]
       LOGGER.info("Adding attribute fields to feature class...")
       for field in FCST_FIELDS:
           AddField_management(tmpForecastFc, **field)
-      #This doesn't seem to do anything
-      #AssignDefaultToField_management(tmpForecastFc, "winter_start_month", "11")
-      #AssignDefaultToField_management(tmpForecastFc, "winter_end_month", "3")
       joined_table = AddJoin_management(tmpForecastFc, "stationTriplet", os.path.join(settings.AWDB_FGDB_PATH, FCST_Active_Ref), "stationTriplet")
-      expression = "reclass(!active_stations_FCST_Ref.huc2!)"
+      # Update huc2
+      expression = f"updateHuc2(!{FCST_Active_Ref}.{HUC2}!)"
       codeblock = """
-      def reclass(huc2):
-          if (huc2 != None):
-              return huc2
-          else:
-              return None"""
-      CalculateField_management(joined_table, "active_stations_FCST_Temp.huc2", expression, "PYTHON3", codeblock)
+def updateHuc2(huc2):
+    if (huc2 != None):
+        return huc2
+    else:
+        return None"""
+      CalculateField_management(joined_table, f"{FCST_Active_Temp}.{HUC2}", expression, "PYTHON3", codeblock)
+      # Update winter_start_month
+      expression = f"updateMonth(!{FCST_Active_Ref}.{WINTER_START_MONTH}!)"
+      codeblock = """
+def updateMonth(month):
+    if (month != None):
+        return month
+    else:
+        return 11"""
+      CalculateField_management(joined_table, f"{FCST_Active_Temp}.{WINTER_START_MONTH}", expression, "PYTHON3", codeblock)
+      # Update winter_end_month
+      expression = f"updateMonth(!{FCST_Active_Ref}.{WINTER_END_MONTH}!)"
+      codeblock = """
+def updateMonth(month):
+    if (month != None):
+        return month
+    else:
+        return 3"""
+      CalculateField_management(joined_table, f"{FCST_Active_Temp}.{WINTER_END_MONTH}", expression, "PYTHON3", codeblock)
+      RemoveJoin_management(joined_table)
+
 
     else:
       LOGGER.error("unable to locate {0} and or {1}. Forecast service will not be updated".format(USGS_Active, BOM_Active))

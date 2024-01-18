@@ -796,9 +796,10 @@ def create_forecast_point_ws():
         LOGGER.info("Adding attribute fields to feature class...")
         for field in FCST_FIELDS:
             AddField_management(tmpForecastFc, **field)
-        joined_table = AddJoin_management(tmpForecastFc, "stationTriplet", os.path.join(settings.AWDB_FGDB_PATH, FCST_Active_Ref), "stationTriplet")
+        joined_table = AddJoin_management(tmpForecastFc, "stationTriplet", settings.AGO_ACTIVE_FCST_URL, "stationTriplet")
+        sourceLayer = f"L0{FCST_Active}"
         # Update huc2
-        expression = f"updateHuc2(!{FCST_Active_Ref}.{HUC2}!)"
+        expression = f"updateHuc2(!{sourceLayer}.{HUC2}!)"
         codeblock = """
 def updateHuc2(huc2):
     if (huc2 != None):
@@ -807,7 +808,7 @@ def updateHuc2(huc2):
         return None"""
         CalculateField_management(joined_table, f"{FCST_Active_Temp}.{HUC2}", expression, "PYTHON3", codeblock)
         # Update winter_start_month
-        expression = f"updateMonth(!{FCST_Active_Ref}.{WINTER_START_MONTH}!)"
+        expression = f"updateMonth(!{sourceLayer}.{WINTER_START_MONTH}!)"
         codeblock = """
 def updateMonth(month):
     if (month != None):
@@ -816,7 +817,7 @@ def updateMonth(month):
         return 11"""
         CalculateField_management(joined_table, f"{FCST_Active_Temp}.{WINTER_START_MONTH}", expression, "PYTHON3", codeblock)
         # Update winter_end_month
-        expression = f"updateMonth(!{FCST_Active_Ref}.{WINTER_END_MONTH}!)"
+        expression = f"updateMonth(!{sourceLayer}.{WINTER_END_MONTH}!)"
         codeblock = """
 def updateMonth(month):
     if (month != None):

@@ -58,3 +58,4 @@ AGO_PASSWORD = # ArcGIS Online password
 PRO_PROJECT_PATH = os.path.join(repo,r"projects\awdb\awdb.aprx")
 ## Suffixes for feature services
 AGO_SUFFIX_ACTIVE = "ACTIVE"
+AGO_ACTIVE_FCST_URL = f"https://services.arcgis.com/SXbDpmb7xQkk44JV/arcgis/rest/services/stations_FORECAST_{AGO_SUFFIX_ACTIVE}/FeatureServer/0"

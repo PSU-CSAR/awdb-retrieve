@@ -718,13 +718,14 @@ def get_USGS_metadata(usgs_fc):
             # no exception so data valid, update row
             cursor.updateRow(row)
 
-def create_forecast_point_ws():
+def update_forecast_point_ws():
     from arcpy import CopyFeatures_management, AddField_management, Append_management, Delete_management, AddJoin_management, CalculateField_management, RemoveJoin_management
     import arcpy
+    import update_ags_online_fs
 
     bUSGSExists = False
     bBORExists = False
-    LOGGER.info("create_forecast_point_ws...")
+    LOGGER.info("update_forecast_point_ws...")
 
     USGS_Active = "active_stations_USGS"
     if arcpy.Exists(os.path.join(settings.AWDB_FGDB_PATH, USGS_Active)):
@@ -732,9 +733,9 @@ def create_forecast_point_ws():
     BOR_Active = "active_stations_BOR"
     if arcpy.Exists(os.path.join(settings.AWDB_FGDB_PATH, BOR_Active)):
         bBORExists = True
-    FCST_Active = "active_stations_FCST"
-    FCST_Active_Temp = "active_stations_FCST_Temp"
-    FCST_Active_Ref = "active_stations_FCST_Ref"
+    stationsForecast = "stations_FCST"
+    FCST_Active = f"active_{stationsForecast}"
+    FCST_Active_Temp = f"{FCST_Active}_Temp"
 
     if (bUSGSExists and bBORExists):
       client = Client(settings.WDSL_URL)
@@ -833,6 +834,8 @@ def updateMonth(month):
          LOGGER.log(15, traceback.format_exc())
          LOGGER.error("Failed to create the forecast layer.")
 
+      LOGGER.log(15, "About to update {0}.".format(FCST_Active))
+      update_ags_online_fs.update_feature_services(settings.PRO_PROJECT_PATH, f"{stationsForecast}_{settings.AGO_SUFFIX_ACTIVE}")
 
     else:
       LOGGER.error("unable to locate {0} and or {1}. Forecast service will not be updated".format(USGS_Active, BOM_Active))
@@ -980,10 +983,6 @@ def main():
         wfsupdatelist.append(projectedfc.getOutput(0))
 
         # end processing of network
-
-        # create forecast webservice
-        # Commenting out. Not ready to use yet
-        create_forecast_point_ws()
         
     if wfsupdatelist:
         LOGGER.info("\nUpdating AGOL feature services in update list...")
@@ -991,6 +990,9 @@ def main():
           fc_name = os.path.basename(wfspath) + "_" + settings.AGO_SUFFIX_ACTIVE
           LOGGER.log(15, "About to update {0}.".format(fc_name))
           update_ags_online_fs.update_feature_services(settings.PRO_PROJECT_PATH, fc_name)
+
+        # update forecast point webservice
+        update_forecast_point_ws()
 
     else:
         LOGGER.error("\nNo web services to update. Aborting...")

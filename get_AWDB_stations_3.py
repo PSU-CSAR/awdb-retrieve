@@ -789,10 +789,12 @@ def update_forecast_point_ws():
         HUC2 = "huc2"
         WINTER_START_MONTH = "winter_start_month"
         WINTER_END_MONTH = "winter_end_month"
+        BAGIS_NOTE = "bagis_note"
         FCST_FIELDS = [
           {"field_name": WINTER_START_MONTH,             "field_type": "SHORT"},  # 0
           {"field_name": WINTER_END_MONTH,               "field_type": "SHORT"},  # 1
-          {"field_name": HUC2,                           "field_type": "TEXT", "field_length": 2} #2
+          {"field_name": HUC2,                           "field_type": "TEXT", "field_length": 2}, #2
+          {"field_name": BAGIS_NOTE,                     "field_type": "TEXT", "field_length": 100} #3
         ]
         LOGGER.info("Adding attribute fields to feature class...")
         for field in FCST_FIELDS:
@@ -800,14 +802,17 @@ def update_forecast_point_ws():
         joined_table = AddJoin_management(tmpForecastFc, "stationTriplet", settings.AGO_ACTIVE_FCST_URL, "stationTriplet")
         sourceLayer = f"L0{FCST_Active}"
         # Update huc2
-        expression = f"updateHuc2(!{sourceLayer}.{HUC2}!)"
+        expression = f"updateText(!{sourceLayer}.{HUC2}!)"
         codeblock = """
-def updateHuc2(huc2):
-    if (huc2 != None):
-        return huc2
+def updateText(txtValue):
+    if (txtValue != None):
+        return txtValue
     else:
         return None"""
         CalculateField_management(joined_table, f"{FCST_Active_Temp}.{HUC2}", expression, "PYTHON3", codeblock)
+        # Update bagis_note
+        expression = f"updateText(!{sourceLayer}.{BAGIS_NOTE}!)"
+        CalculateField_management(joined_table, f"{FCST_Active_Temp}.{BAGIS_NOTE}", expression, "PYTHON3", codeblock)
         # Update winter_start_month
         expression = f"updateMonth(!{sourceLayer}.{WINTER_START_MONTH}!)"
         codeblock = """
@@ -829,6 +834,7 @@ def updateMonth(month):
         RemoveJoin_management(joined_table)
         LOGGER.info("Copy results to " + os.path.join(settings.AWDB_FGDB_PATH, FCST_Active))
         CopyFeatures_management(tmpForecastFc,  os.path.join(settings.AWDB_FGDB_PATH, FCST_Active))
+        Delete_management(tmpForecastFc)
       except Exception as e:
          LOGGER.log(15, e)
          LOGGER.log(15, traceback.format_exc())

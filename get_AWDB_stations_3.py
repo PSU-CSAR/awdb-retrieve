@@ -787,6 +787,7 @@ def update_forecast_point_ws():
         Append_management([os.path.join(settings.AWDB_FGDB_PATH, BOR_Active_Temp)], tmpForecastFc)
         Delete_management(os.path.join(settings.AWDB_FGDB_PATH, BOR_Active_Temp))
         HUC2 = "huc2"
+        HUC = "huc"
         WINTER_START_MONTH = "winter_start_month"
         WINTER_END_MONTH = "winter_end_month"
         BAGIS_NOTE = "bagis_note"
@@ -813,6 +814,17 @@ def updateText(txtValue):
         # Update bagis_note
         expression = f"updateText(!{sourceLayer}.{BAGIS_NOTE}!)"
         CalculateField_management(joined_table, f"{FCST_Active_Temp}.{BAGIS_NOTE}", expression, "PYTHON3", codeblock)
+        # Update huc2 from huc if still null
+        expression = f"updateHuc2(!{sourceLayer}.{HUC2}!,!{sourceLayer}.{HUC}!)"
+        codeblock = """
+def updateHuc2(huc2, huc):
+    if (huc2 != None):
+        return huc2
+    elif (huc != None):
+        return huc[0:2]
+    else:
+        return None"""
+        CalculateField_management(joined_table, f"{FCST_Active_Temp}.{HUC2}", expression, "PYTHON3", codeblock)
         # Update winter_start_month
         expression = f"updateMonth(!{sourceLayer}.{WINTER_START_MONTH}!)"
         codeblock = """

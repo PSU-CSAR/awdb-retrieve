@@ -44,7 +44,6 @@ __DEBUG__ = False  # true outputs debug-level messages to stderr
 # NRCS AWDB network codes to download
 NETWORKS = ["SNTL", "SNOW", "USGS", "COOP", "SCAN", "SNTLT", "OTHER", "BOR",
             "MPRC", "MSNT"]
-#NETWORKS = ["USGS"]
 
 
 ## Dictionaries of the station fields
@@ -718,13 +717,14 @@ def get_USGS_metadata(usgs_fc):
             # no exception so data valid, update row
             cursor.updateRow(row)
 
-def create_forecast_point_ws():
-    from arcpy import CopyFeatures_management
+def update_forecast_point_ws():
+    from arcpy import CopyFeatures_management, AddField_management, Append_management, Delete_management, AddJoin_management, CalculateField_management, RemoveJoin_management
     import arcpy
+    import update_ags_online_fs
 
     bUSGSExists = False
     bBORExists = False
-    LOGGER.info("create_forecast_point_ws...")
+    LOGGER.info("update_forecast_point_ws...")
 
     USGS_Active = "active_stations_USGS"
     if arcpy.Exists(os.path.join(settings.AWDB_FGDB_PATH, USGS_Active)):
@@ -732,7 +732,9 @@ def create_forecast_point_ws():
     BOR_Active = "active_stations_BOR"
     if arcpy.Exists(os.path.join(settings.AWDB_FGDB_PATH, BOR_Active)):
         bBORExists = True
-    FCST_Active = "active_stations_FCST"
+    stationsForecast = "stations_FCST"
+    FCST_Active = f"active_{stationsForecast}"
+    FCST_Active_Temp = f"{FCST_Active}_Temp"
 
     if (bUSGSExists and bBORExists):
       client = Client(settings.WDSL_URL)
@@ -749,39 +751,108 @@ def create_forecast_point_ws():
       numberofstations = len(data)
       LOGGER.info('We processed %d records', numberofstations)
       LOGGER.info('%d records in array', len(forecastIDs))
-      BOR_Temp_Active = "temp_" + BOR_Active
+      BOR_Active_Temp = BOR_Active + "_Temp"
       sourceFc = os.path.join(settings.AWDB_FGDB_PATH, USGS_Active)
-      targetFc = os.path.join(settings.AWDB_FGDB_PATH, FCST_Active)
-      CopyFeatures_management(sourceFc, targetFc)
-      LOGGER.info("Before %d records", getCount(targetFc))
-      with arcpy.da.UpdateCursor(targetFc, ('stationTriplet')) as curs:
-          for row in curs:
+      targetFc = os.path.join(settings.AWDB_FGDB_PATH, FCST_Active_Temp)
+      try:
+        CopyFeatures_management(sourceFc, targetFc)
+        LOGGER.info("Before %d records", getCount(targetFc))
+        with arcpy.da.UpdateCursor(targetFc, ('stationTriplet')) as curs:
+            for row in curs:
                 test_triplet = row[0]
                 if (test_triplet not in forecastIDs):                
                     curs.deleteRow()
-      LOGGER.info("After %d records", getCount(targetFc))
-      sourceFc = os.path.join(settings.AWDB_FGDB_PATH, BOR_Active)
-      targetFc = os.path.join(settings.AWDB_FGDB_PATH, BOR_Temp_Active)
-      CopyFeatures_management(sourceFc, targetFc)
-      forecastIDs.clear()
-      data = client.service.getForecastPoints(networkCds="BOR",logicalAnd="true")
-      if data:
-        for station in data:
-          try:
-            forecastIDs.append(station["stationTriplet"])
-          except:
-            pass
-      numberofstations = len(data)
-      LOGGER.info('%d records in array', len(forecastIDs))
-      with arcpy.da.UpdateCursor(targetFc, ('stationTriplet')) as curs:
-          for row in curs:
+        LOGGER.info("After %d records", getCount(targetFc))
+        sourceFc = os.path.join(settings.AWDB_FGDB_PATH, BOR_Active)
+        targetFc = os.path.join(settings.AWDB_FGDB_PATH, BOR_Active_Temp)
+        CopyFeatures_management(sourceFc, targetFc)
+        forecastIDs.clear()
+        data = client.service.getForecastPoints(networkCds="BOR",logicalAnd="true")
+        if data:
+          for station in data:
+            try:
+              forecastIDs.append(station["stationTriplet"])
+            except:
+              pass
+        numberofstations = len(data)
+        LOGGER.info('%d records in array', len(forecastIDs))
+        with arcpy.da.UpdateCursor(targetFc, ('stationTriplet')) as curs:
+            for row in curs:
                 test_triplet = row[0]
                 if (test_triplet not in forecastIDs):                
                     curs.deleteRow()
-      LOGGER.info("After %d records", getCount(targetFc))
+        LOGGER.info("After %d records", getCount(targetFc))
+        tmpForecastFc = os.path.join(settings.AWDB_FGDB_PATH, FCST_Active_Temp)
+        Append_management([os.path.join(settings.AWDB_FGDB_PATH, BOR_Active_Temp)], tmpForecastFc)
+        Delete_management(os.path.join(settings.AWDB_FGDB_PATH, BOR_Active_Temp))
+        HUC2 = "huc2"
+        HUC = "huc"
+        WINTER_START_MONTH = "winter_start_month"
+        WINTER_END_MONTH = "winter_end_month"
+        BAGIS_NOTE = "bagis_note"
+        FCST_FIELDS = [
+          {"field_name": WINTER_START_MONTH,             "field_type": "SHORT"},  # 0
+          {"field_name": WINTER_END_MONTH,               "field_type": "SHORT"},  # 1
+          {"field_name": HUC2,                           "field_type": "TEXT", "field_length": 2}, #2
+          {"field_name": BAGIS_NOTE,                     "field_type": "TEXT", "field_length": 100} #3
+        ]
+        LOGGER.info("Adding attribute fields to feature class...")
+        for field in FCST_FIELDS:
+            AddField_management(tmpForecastFc, **field)
+        joined_table = AddJoin_management(tmpForecastFc, "stationTriplet", settings.AGO_ACTIVE_FCST_URL, "stationTriplet")
+        sourceLayer = f"L0{FCST_Active}"
+        # Update huc2
+        expression = f"updateText(!{sourceLayer}.{HUC2}!)"
+        codeblock = """
+def updateText(txtValue):
+    if (txtValue != None):
+        return txtValue
+    else:
+        return None"""
+        CalculateField_management(joined_table, f"{FCST_Active_Temp}.{HUC2}", expression, "PYTHON3", codeblock)
+        # Update bagis_note
+        expression = f"updateText(!{sourceLayer}.{BAGIS_NOTE}!)"
+        CalculateField_management(joined_table, f"{FCST_Active_Temp}.{BAGIS_NOTE}", expression, "PYTHON3", codeblock)
+        # Update huc2 from huc if still null
+        expression = f"updateHuc2(!{sourceLayer}.{HUC2}!,!{sourceLayer}.{HUC}!)"
+        codeblock = """
+def updateHuc2(huc2, huc):
+    if (huc2 != None):
+        return huc2
+    elif (huc != None):
+        return huc[0:2]
+    else:
+        return None"""
+        CalculateField_management(joined_table, f"{FCST_Active_Temp}.{HUC2}", expression, "PYTHON3", codeblock)
+        # Update winter_start_month
+        expression = f"updateMonth(!{sourceLayer}.{WINTER_START_MONTH}!)"
+        codeblock = """
+def updateMonth(month):
+    if (month != None):
+        return month
+    else:
+        return 11"""
+        CalculateField_management(joined_table, f"{FCST_Active_Temp}.{WINTER_START_MONTH}", expression, "PYTHON3", codeblock)
+        # Update winter_end_month
+        expression = f"updateMonth(!{sourceLayer}.{WINTER_END_MONTH}!)"
+        codeblock = """
+def updateMonth(month):
+    if (month != None):
+        return month
+    else:
+        return 3"""
+        CalculateField_management(joined_table, f"{FCST_Active_Temp}.{WINTER_END_MONTH}", expression, "PYTHON3", codeblock)
+        RemoveJoin_management(joined_table)
+        LOGGER.info("Copy results to " + os.path.join(settings.AWDB_FGDB_PATH, FCST_Active))
+        CopyFeatures_management(tmpForecastFc,  os.path.join(settings.AWDB_FGDB_PATH, FCST_Active))
+        Delete_management(tmpForecastFc)
+      except Exception as e:
+         LOGGER.log(15, e)
+         LOGGER.log(15, traceback.format_exc())
+         LOGGER.error("Failed to create the forecast layer.")
 
-
-
+      LOGGER.log(15, "About to update {0}.".format(FCST_Active))
+      update_ags_online_fs.update_feature_services(settings.PRO_PROJECT_PATH, f"{stationsForecast}_{settings.AGO_SUFFIX_ACTIVE}")
 
     else:
       LOGGER.error("unable to locate {0} and or {1}. Forecast service will not be updated".format(USGS_Active, BOM_Active))
@@ -929,10 +1000,6 @@ def main():
         wfsupdatelist.append(projectedfc.getOutput(0))
 
         # end processing of network
-
-        # create forecast webservice
-        # Commenting out. Not ready to use yet
-        # create_forecast_point_ws()
         
     if wfsupdatelist:
         LOGGER.info("\nUpdating AGOL feature services in update list...")
@@ -940,6 +1007,9 @@ def main():
           fc_name = os.path.basename(wfspath) + "_" + settings.AGO_SUFFIX_ACTIVE
           LOGGER.log(15, "About to update {0}.".format(fc_name))
           update_ags_online_fs.update_feature_services(settings.PRO_PROJECT_PATH, fc_name)
+
+        # update forecast point webservice
+        update_forecast_point_ws()
 
     else:
         LOGGER.error("\nNo web services to update. Aborting...")

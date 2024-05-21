@@ -45,7 +45,6 @@ __DEBUG__ = False  # true outputs debug-level messages to stderr
 NETWORKS = ["SNTL", "SNOW", "USGS", "COOP", "SCAN", "SNTLT", "OTHER", "BOR",
             "MPRC", "MSNT"]
 
-
 ## Dictionaries of the station fields
 # these fields are required, and are geometry,
 # so do not need to be aded to the output FC
@@ -718,7 +717,7 @@ def get_USGS_metadata(usgs_fc):
             cursor.updateRow(row)
 
 def update_forecast_point_ws():
-    from arcpy import CopyFeatures_management, AddField_management, Append_management, Delete_management, AddJoin_management, CalculateField_management, RemoveJoin_management
+    from arcpy import CopyFeatures_management, AddField_management, Append_management, Delete_management, AddJoin_management, CalculateField_management, RemoveJoin_management, ListFields
     import arcpy
     import update_ags_online_fs
 
@@ -797,8 +796,15 @@ def update_forecast_point_ws():
           {"field_name": BAGIS_NOTE,                     "field_type": "TEXT", "field_length": 100} #3
         ]
         LOGGER.info("Adding attribute fields to feature class...")
+        # check for area field and add if missing
+        fields = ListFields(tmpForecastFc)
+
         for field in FCST_FIELDS:
-            AddField_management(tmpForecastFc, **field)
+          for afield in fields:
+            if afield.name == field:
+                break
+            else:
+                AddField_management(tmpForecastFc, **field)
         joined_table = AddJoin_management(tmpForecastFc, "stationTriplet", settings.AGO_ACTIVE_FCST_URL, "stationTriplet")
         sourceLayer = f"L0{FCST_Active}"
         # Update huc2

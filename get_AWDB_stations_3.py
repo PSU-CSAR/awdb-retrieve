@@ -796,17 +796,16 @@ def update_forecast_point_ws():
           {"field_name": BAGIS_NOTE,                     "field_type": "TEXT", "field_length": 100} #3
         ]
         LOGGER.info("Adding attribute fields to feature class...")
-        # check for area field and add if missing
+        # check for NWCC custom fields and add if missing
         fields = ListFields(tmpForecastFc)
-
         for field in FCST_FIELDS:
-          for afield in fields:
-            if afield.name == field:
+            if field in fields:
                 break
             else:
-                AddField_management(tmpForecastFc, **field)
+               AddField_management(tmpForecastFc, **field)
+               LOGGER.info(f"Adding field {field['field_name']} to feature class")              
         joined_table = AddJoin_management(tmpForecastFc, "stationTriplet", settings.AGO_ACTIVE_FCST_URL, "stationTriplet")
-        sourceLayer = f"L0{FCST_Active}"
+        sourceLayer = f"L0{stationsForecast}_{settings.AGO_SUFFIX_ACTIVE}"
         # Update huc2
         expression = f"updateText(!{sourceLayer}.{HUC2}!)"
         codeblock = """

@@ -4,6 +4,7 @@ import os, sys
 from arcgis.gis import GIS
 import logging
 import datetime
+from arcgis.gis._impl._content_manager import SharingLevel
 
 
 # load settings from settings_ags_online.py
@@ -64,9 +65,20 @@ def update_feature_services(project_path, sd_fs_name):
       LOGGER.info("Overwriting existing feature service...")
       fs = sdItem.publish(overwrite=True)
 
-      if shrOrg or shrEveryone or shrGroups:
-        LOGGER.debug("Setting sharing options...")
-        fs.share(org=shrOrg, everyone=shrEveryone, groups=shrGroups)
+      #if shrOrg or shrEveryone or shrGroups:
+      LOGGER.debug("Setting sharing options...")
+        #  fs.share(org=shrOrg, everyone=shrEveryone, groups=shrGroups)
+      sharing_mgr = fs.sharing
+      if shrOrg:
+        sharing_mgr.sharing_level = SharingLevel.ORG
+      if shrEveryone:
+        sharing_mgr.sharing_level = SharingLevel.EVERYONE
+      if shrGroups:
+        for groupID in shrGroups:
+          group = gis.groups.get(groupID)
+          item_grp_sharing_mgr = sharing_mgr.groups
+          item_grp_sharing_mgr.add(group=group)
+
 
       LOGGER.info("Finished updating: {} – ID: {}".format(fs.title, fs.id))
     else:

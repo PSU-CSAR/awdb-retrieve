@@ -59,10 +59,15 @@ def update_feature_services(project_path, sd_fs_name):
 
       # Find the SD, update it, publish /w overwrite and set sharing and metadata
       LOGGER.debug("Search for original SD on portal...")
-      sdItem = gis.content.search("{} AND owner:{}".format(sd_fs_name, settings.AGO_USER), item_type="Service Definition")[0]
-      LOGGER.debug("Found SD: {}, ID: {} n Uploading and overwriting…".format(sdItem.title, sdItem.id))
+      sdItem = None
+      sdItemList = gis.content.search("{} AND owner:{}".format(sd_fs_name, settings.AGO_USER), item_type="Service Definition")
+      for val in sdItemList:
+        if val.title == sd_fs_name:
+          sdItem = val
+          break
+      LOGGER.info("Found SD: {}, ID: {} n Uploading and overwriting…".format(sdItem.title, sdItem.id))
       sdItem.update(data=sd)
-      LOGGER.info("Overwriting existing feature service...")
+      LOGGER.debug("Overwriting existing feature service...")
       fs = sdItem.publish(overwrite=True)
 
       if shrOrg or shrEveryone or shrGroups:

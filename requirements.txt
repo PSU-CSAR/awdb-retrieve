@@ -1,5 +1,2 @@
 https://github.com/jkeifer/arcpy-extensions/tarball/0.0.1
 suds-jurko==0.6
-requests==2.29.0
-urllib3==1.26.8
-arcgis==1.8.4
